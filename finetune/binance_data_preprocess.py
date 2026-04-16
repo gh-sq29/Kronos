@@ -76,18 +76,20 @@ class BinanceDataPreprocessor:
         raw[_COL_OPEN_TIME] = pd.to_numeric(raw[_COL_OPEN_TIME], errors='coerce')
         raw = raw.dropna(subset=[_COL_OPEN_TIME])
 
-        # Normalize timestamps to milliseconds.
-        # Binance sometimes uses microseconds (16-digit) instead of milliseconds (13-digit).
-        # Threshold: any value > 13-digit max (year ~2286 in ms) is in microseconds.
+        # Normalize timestamps to milliseconds per-row.
+        # Binance changed some files to microseconds (16-digit) from milliseconds (13-digit).
+        # Threshold: pandas datetime64[ns] max is ~year 2262, i.e. ~9.2e12 ms.
+        # Any value above that must be in microseconds → divide by 1000.
         _MS_MAX = 9_999_999_999_999
-        if raw[_COL_OPEN_TIME].median() > _MS_MAX:
-            raw[_COL_OPEN_TIME] = (raw[_COL_OPEN_TIME] // 1000).astype('int64')
+        mask_us = raw[_COL_OPEN_TIME] > _MS_MAX
+        raw.loc[mask_us, _COL_OPEN_TIME] = raw.loc[mask_us, _COL_OPEN_TIME] // 1000
+        # Drop any rows still out of range after normalization.
+        raw = raw[raw[_COL_OPEN_TIME] <= _MS_MAX]
 
-        # Parse timestamps (milliseconds → UTC datetime).
-        ts = pd.to_datetime(raw[_COL_OPEN_TIME], unit='ms', utc=True, errors='coerce').dt.tz_localize(None)
-        valid_mask = ts.notna()
-        ts = ts[valid_mask]
-        raw = raw[valid_mask]
+        # Parse timestamps. Convert to int64 first for reliable nanosecond handling.
+        ts = pd.to_datetime(
+            raw[_COL_OPEN_TIME].astype('int64'), unit='ms', utc=True
+        ).dt.tz_localize(None)
         ts.name = 'datetime'
 
         # Build the required feature columns.
