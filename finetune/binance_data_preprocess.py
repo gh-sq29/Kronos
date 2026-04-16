@@ -71,17 +71,23 @@ class BinanceDataPreprocessor:
 
         raw = pd.concat(frames, ignore_index=True)
 
+        # Some files have a header row or a trailing summary row with non-numeric
+        # values. Convert to numeric first and drop any rows that fail to parse.
+        raw[_COL_OPEN_TIME] = pd.to_numeric(raw[_COL_OPEN_TIME], errors='coerce')
+        raw = raw.dropna(subset=[_COL_OPEN_TIME])
+
         # Parse timestamps (milliseconds → UTC datetime).
-        raw.index = pd.to_datetime(raw[_COL_OPEN_TIME], unit='ms', utc=True).dt.tz_localize(None)
-        raw.index.name = 'datetime'
+        ts = pd.to_datetime(raw[_COL_OPEN_TIME], unit='ms', utc=True).dt.tz_localize(None)
+        ts.name = 'datetime'
 
         # Build the required feature columns.
-        symbol_df = pd.DataFrame(index=raw.index)
-        symbol_df['open']  = raw[_COL_OPEN].astype(float)
-        symbol_df['high']  = raw[_COL_HIGH].astype(float)
-        symbol_df['low']   = raw[_COL_LOW].astype(float)
-        symbol_df['close'] = raw[_COL_CLOSE].astype(float)
-        symbol_df['vol']   = raw[_COL_VOLUME].astype(float)
+        symbol_df = pd.DataFrame(index=ts)
+        symbol_df.index.name = 'datetime'
+        symbol_df['open']  = raw[_COL_OPEN].to_numpy(dtype=float)
+        symbol_df['high']  = raw[_COL_HIGH].to_numpy(dtype=float)
+        symbol_df['low']   = raw[_COL_LOW].to_numpy(dtype=float)
+        symbol_df['close'] = raw[_COL_CLOSE].to_numpy(dtype=float)
+        symbol_df['vol']   = raw[_COL_VOLUME].to_numpy(dtype=float)
         symbol_df['amt']   = raw[_COL_QUOTE_VOL].astype(float)
 
         symbol_df = symbol_df.sort_index()
