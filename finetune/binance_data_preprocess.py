@@ -73,23 +73,32 @@ class BinanceDataPreprocessor:
 
         # Some files have a header row or a trailing summary row with non-numeric
         # values. Convert to numeric first and drop any rows that fail to parse.
-        raw[_COL_OPEN_TIME] = pd.to_numeric(raw[_COL_OPEN_TIME], errors='coerce')
-        raw = raw.dropna(subset=[_COL_OPEN_TIME])
+        numeric_ts = pd.to_numeric(raw[_COL_OPEN_TIME], errors='coerce')
 
-        # Normalize timestamps to milliseconds per-row.
-        # Binance changed some files to microseconds (16-digit) from milliseconds (13-digit).
-        # Threshold: pandas datetime64[ns] max is ~year 2262, i.e. ~9.2e12 ms.
-        # Any value above that must be in microseconds → divide by 1000.
-        _MS_MAX = 9_999_999_999_999
-        mask_us = raw[_COL_OPEN_TIME] > _MS_MAX
-        raw.loc[mask_us, _COL_OPEN_TIME] = raw.loc[mask_us, _COL_OPEN_TIME] // 1000
-        # Drop any rows still out of range after normalization.
-        raw = raw[raw[_COL_OPEN_TIME] <= _MS_MAX]
+        if numeric_ts.notna().any():
+            # Standard Binance format: Unix millisecond (or microsecond) integers.
+            raw[_COL_OPEN_TIME] = numeric_ts
+            raw = raw.dropna(subset=[_COL_OPEN_TIME])
 
-        # Parse timestamps. Convert to int64 first for reliable nanosecond handling.
-        ts = pd.to_datetime(
-            raw[_COL_OPEN_TIME].astype('int64'), unit='ms', utc=True
-        ).dt.tz_localize(None)
+            # Normalize timestamps to milliseconds per-row.
+            # Binance changed some files to microseconds (16-digit) from milliseconds (13-digit).
+            # Threshold: pandas datetime64[ns] max is ~year 2262, i.e. ~9.2e12 ms.
+            # Any value above that must be in microseconds → divide by 1000.
+            _MS_MAX = 9_999_999_999_999
+            mask_us = raw[_COL_OPEN_TIME] > _MS_MAX
+            raw.loc[mask_us, _COL_OPEN_TIME] = raw.loc[mask_us, _COL_OPEN_TIME] // 1000
+            raw = raw[raw[_COL_OPEN_TIME] <= _MS_MAX]
+
+            ts = pd.to_datetime(
+                raw[_COL_OPEN_TIME].astype('int64'), unit='ms', utc=True
+            ).dt.tz_convert(None)
+        else:
+            # Alternate format: datetime strings (e.g. "2020-01-01 00:00:00").
+            parsed = pd.to_datetime(raw[_COL_OPEN_TIME], errors='coerce', utc=True)
+            valid = parsed.notna()
+            raw = raw[valid]
+            ts = parsed[valid].dt.tz_convert(None)
+
         ts.name = 'datetime'
 
         # Build the required feature columns.
