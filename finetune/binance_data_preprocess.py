@@ -109,7 +109,7 @@ class BinanceDataPreprocessor:
         symbol_df['low']   = raw[_COL_LOW].to_numpy(dtype=float)
         symbol_df['close'] = raw[_COL_CLOSE].to_numpy(dtype=float)
         symbol_df['vol']   = raw[_COL_VOLUME].to_numpy(dtype=float)
-        symbol_df['amt']   = raw[_COL_QUOTE_VOL].astype(float)
+        symbol_df['amt']   = raw[_COL_QUOTE_VOL].to_numpy(dtype=float)
 
         symbol_df = symbol_df.sort_index()
         symbol_df = symbol_df.dropna()
