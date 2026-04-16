@@ -76,12 +76,22 @@ class BinanceDataPreprocessor:
         raw[_COL_OPEN_TIME] = pd.to_numeric(raw[_COL_OPEN_TIME], errors='coerce')
         raw = raw.dropna(subset=[_COL_OPEN_TIME])
 
+        # Normalize timestamps to milliseconds.
+        # Binance sometimes uses microseconds (16-digit) instead of milliseconds (13-digit).
+        # Threshold: any value > 13-digit max (year ~2286 in ms) is in microseconds.
+        _MS_MAX = 9_999_999_999_999
+        if raw[_COL_OPEN_TIME].median() > _MS_MAX:
+            raw[_COL_OPEN_TIME] = (raw[_COL_OPEN_TIME] // 1000).astype('int64')
+
         # Parse timestamps (milliseconds → UTC datetime).
-        ts = pd.to_datetime(raw[_COL_OPEN_TIME], unit='ms', utc=True).dt.tz_localize(None)
+        ts = pd.to_datetime(raw[_COL_OPEN_TIME], unit='ms', utc=True, errors='coerce').dt.tz_localize(None)
+        valid_mask = ts.notna()
+        ts = ts[valid_mask]
+        raw = raw[valid_mask]
         ts.name = 'datetime'
 
         # Build the required feature columns.
-        symbol_df = pd.DataFrame(index=ts)
+        symbol_df = pd.DataFrame(index=ts.values)
         symbol_df.index.name = 'datetime'
         symbol_df['open']  = raw[_COL_OPEN].to_numpy(dtype=float)
         symbol_df['high']  = raw[_COL_HIGH].to_numpy(dtype=float)
