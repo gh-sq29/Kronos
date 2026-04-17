@@ -6,17 +6,50 @@ import pickle
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 
 sys.path.append('../')
 from config import Config
 from model.kronos import Kronos, KronosTokenizer, auto_regressive_inference
-from qlib_test import QlibTestDataset, load_models
 
 
-class EvalDataset(QlibTestDataset):
-    """Extends QlibTestDataset to also return normalized ground truth."""
+def load_models(config: dict):
+    device = torch.device(config['device'])
+    print(f"Loading models onto device: {device}...")
+    tokenizer = KronosTokenizer.from_pretrained(config['tokenizer_path']).to(device).eval()
+    model = Kronos.from_pretrained(config['model_path']).to(device).eval()
+    return tokenizer, model
+
+
+class EvalDataset(Dataset):
+    """Sliding-window dataset over test_data.pkl, returns normalized x and ground truth."""
+
+    def __init__(self, data: dict, config: Config):
+        self.config = config
+        self.feature_list = config.feature_list
+        self.time_feature_list = config.time_feature_list
+        self.window_size = config.lookback_window + config.predict_window
+        self.indices = []
+
+        print("Building dataset indices...")
+        self.data = {}
+        for symbol, df in data.items():
+            df = df.reset_index()
+            df['minute'] = df['datetime'].dt.minute
+            df['hour'] = df['datetime'].dt.hour
+            df['weekday'] = df['datetime'].dt.weekday
+            df['day'] = df['datetime'].dt.day
+            df['month'] = df['datetime'].dt.month
+            self.data[symbol] = df
+
+            num_samples = len(df) - self.window_size + 1
+            for i in range(max(0, num_samples)):
+                timestamp = df.iloc[i + config.lookback_window - 1]['datetime']
+                self.indices.append((symbol, i, timestamp))
+
+    def __len__(self):
+        return len(self.indices)
 
     def __getitem__(self, idx):
         symbol, start_idx, timestamp = self.indices[idx]
