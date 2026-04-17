@@ -108,6 +108,7 @@ def main():
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--sample_count', type=int, default=1)
     parser.add_argument('--output', default='eval_results.csv', help='Path to save per-sample predictions')
+    parser.add_argument('--max_samples', type=int, default=0, help='Limit samples for timing test (0 = all)')
     args = parser.parse_args()
 
     tokenizer, model = load_models({
@@ -127,6 +128,9 @@ def main():
     config.predict_window = args.predict_window
 
     dataset = EvalDataset(data=test_data, config=config)
+    if args.max_samples > 0:
+        dataset.indices = dataset.indices[:args.max_samples]
+        print(f"Limited to {args.max_samples} samples for timing test")
     loader = DataLoader(
         dataset,
         batch_size=args.batch_size,
@@ -139,6 +143,8 @@ def main():
     all_true_close = []
     records = []
 
+    import time
+    t0 = time.time()
     print(f"Running inference on {len(dataset)} samples...")
     with torch.no_grad():
         for x, x_stamp, y_stamp, symbols, timestamps, y_gt in tqdm(loader):
@@ -181,6 +187,11 @@ def main():
     pred_last = np.array([r['pred_close_last'] for r in records])
     true_last = np.array([r['true_close_last'] for r in records])
     dir_acc = float(np.mean(np.sign(pred_last) == np.sign(true_last)))
+
+    elapsed = time.time() - t0
+    total_samples = len(dataset)
+    print(f"\nInference time: {elapsed:.1f}s for {total_samples} samples "
+          f"({elapsed/total_samples*1000:.1f} ms/sample)")
 
     print(f"\n{'='*45}")
     print(f"Evaluation Results (normalized space)")

@@ -10,4 +10,5 @@ python eval_csv_model.py \
   --device cuda:0 \
   --batch_size 32 \
   --sample_count 1 \
+  --max_samples 100 \
   --output eval_results.csv
