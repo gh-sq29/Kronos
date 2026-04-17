@@ -82,11 +82,13 @@ class EvalDataset(Dataset):
             symbol,
             timestamp,
             torch.from_numpy(y_norm),
+            torch.from_numpy(x_mean),   # per-feature mean of context
+            torch.from_numpy(x_std),    # per-feature std of context
         )
 
 
 def collate_fn_with_gt(batch):
-    x, x_stamp, y_stamp, symbols, timestamps, y_gt = zip(*batch)
+    x, x_stamp, y_stamp, symbols, timestamps, y_gt, x_mean, x_std = zip(*batch)
     return (
         torch.stack(x),
         torch.stack(x_stamp),
@@ -94,6 +96,8 @@ def collate_fn_with_gt(batch):
         list(symbols),
         list(timestamps),
         torch.stack(y_gt),
+        torch.stack(x_mean),
+        torch.stack(x_std),
     )
 
 
@@ -147,7 +151,7 @@ def main():
     t0 = time.time()
     print(f"Running inference on {len(dataset)} samples...")
     with torch.no_grad():
-        for x, x_stamp, y_stamp, symbols, timestamps, y_gt in tqdm(loader):
+        for x, x_stamp, y_stamp, symbols, timestamps, y_gt, x_mean, x_std in tqdm(loader):
             preds = auto_regressive_inference(
                 tokenizer, model,
                 x.to(device), x_stamp.to(device), y_stamp.to(device),
@@ -160,10 +164,18 @@ def main():
             # preds: (batch, lookback + pred_len, 6) — take last pred_len steps
             pred_window = preds[:, -args.predict_window:, :]  # (batch, pred_len, 6)
             y_gt_np = y_gt.numpy()                            # (batch, pred_len, 6)
+            mean_np = x_mean.numpy()                          # (batch, 6)
+            std_np = x_std.numpy()                            # (batch, 6)
 
             # close is at feature index 3
-            pred_close = pred_window[:, :, 3]  # (batch, pred_len)
-            true_close = y_gt_np[:, :, 3]      # (batch, pred_len)
+            pred_close_norm = pred_window[:, :, 3]   # (batch, pred_len)
+            true_close_norm = y_gt_np[:, :, 3]
+
+            # denormalize: value * (std + 1e-5) + mean
+            close_mean = mean_np[:, 3:4]             # (batch, 1)
+            close_std  = std_np[:, 3:4]
+            pred_close = pred_close_norm * (close_std + 1e-5) + close_mean
+            true_close = true_close_norm * (close_std + 1e-5) + close_mean
 
             all_pred_close.append(pred_close)
             all_true_close.append(true_close)
@@ -172,6 +184,10 @@ def main():
                 records.append({
                     'symbol': sym,
                     'timestamp': ts,
+                    'pred_close_t15': float(pred_close[i, 14]),
+                    'true_close_t15': float(true_close[i, 14]),
+                    'pred_close_t20': float(pred_close[i, 19]),
+                    'true_close_t20': float(true_close[i, 19]),
                     'pred_close_last': float(pred_close[i, -1]),
                     'true_close_last': float(true_close[i, -1]),
                     'pred_close_mean': float(pred_close[i].mean()),
@@ -184,9 +200,17 @@ def main():
     mse = float(np.mean((all_pred - all_true) ** 2))
     mae = float(np.mean(np.abs(all_pred - all_true)))
 
-    pred_last = np.array([r['pred_close_last'] for r in records])
-    true_last = np.array([r['true_close_last'] for r in records])
-    dir_acc = float(np.mean(np.sign(pred_last) == np.sign(true_last)))
+    def step_metrics(pred_key, true_key):
+        p = np.array([r[pred_key] for r in records])
+        t = np.array([r[true_key] for r in records])
+        mse_ = float(np.mean((p - t) ** 2))
+        mae_ = float(np.mean(np.abs(p - t)))
+        dir_ = float(np.mean(np.sign(p - t) == np.sign(t - t)))  # direction vs context mean=0
+        return mse_, mae_
+
+    mse_t15, mae_t15 = step_metrics('pred_close_t15', 'true_close_t15')
+    mse_t20, mae_t20 = step_metrics('pred_close_t20', 'true_close_t20')
+    mse_last, mae_last = step_metrics('pred_close_last', 'true_close_last')
 
     elapsed = time.time() - t0
     total_samples = len(dataset)
@@ -194,12 +218,14 @@ def main():
           f"({elapsed/total_samples*1000:.1f} ms/sample)")
 
     print(f"\n{'='*45}")
-    print(f"Evaluation Results (normalized space)")
+    print(f"Evaluation Results (actual price space)")
     print(f"{'='*45}")
-    print(f"  Samples     : {len(records)}")
-    print(f"  MSE         : {mse:.6f}")
-    print(f"  MAE         : {mae:.6f}")
-    print(f"  Dir Acc (last step) : {dir_acc:.4f}")
+    print(f"  Samples : {len(records)}")
+    print(f"  {'':10s}  {'MSE':>12s}  {'MAE':>12s}")
+    print(f"  {'T+15':10s}  {mse_t15:>12.4f}  {mae_t15:>12.4f}")
+    print(f"  {'T+20':10s}  {mse_t20:>12.4f}  {mae_t20:>12.4f}")
+    print(f"  {'T+48(last)':10s}  {mse_last:>12.4f}  {mae_last:>12.4f}")
+    print(f"  {'all steps':10s}  {mse:>12.4f}  {mae:>12.4f}")
     print(f"{'='*45}")
 
     results_df = pd.DataFrame(records)
