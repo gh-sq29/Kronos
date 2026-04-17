@@ -6,7 +6,7 @@ import zipfile
 import requests
 from tqdm import tqdm
 
-BINANCE_DATA_BASE = "https://data.binance.vision/data/spot/daily/klines/BTCUSDT"
+BINANCE_DATA_BASE = "https://data.binance.vision/data/futures/um/daily/klines/BTCUSDT"
 
 
 class BinanceDataFetcher:
