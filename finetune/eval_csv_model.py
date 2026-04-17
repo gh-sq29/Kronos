@@ -143,8 +143,6 @@ def main():
         collate_fn=collate_fn_with_gt,
     )
 
-    all_pred_close = []
-    all_true_close = []
     records = []
 
     import time
@@ -177,56 +175,54 @@ def main():
             pred_close = pred_close_norm * (close_std + 1e-5) + close_mean
             true_close = true_close_norm * (close_std + 1e-5) + close_mean
 
-            all_pred_close.append(pred_close)
-            all_true_close.append(true_close)
+            # start_price: last close of context window (normalized=0 after instance norm → denorm = mean)
+            x_np = x.numpy()
+            start_price = x_np[:, -1, 3] * (close_std[:, 0] + 1e-5) + close_mean[:, 0]  # (batch,)
 
             for i, (sym, ts) in enumerate(zip(symbols, timestamps)):
+                sp = float(start_price[i])
                 records.append({
                     'symbol': sym,
                     'timestamp': ts,
+                    'start_close': sp,
+                    'pred_close_t5':  float(pred_close[i,  4]),
+                    'true_close_t5':  float(true_close[i,  4]),
+                    'pred_close_t10': float(pred_close[i,  9]),
+                    'true_close_t10': float(true_close[i,  9]),
                     'pred_close_t15': float(pred_close[i, 14]),
                     'true_close_t15': float(true_close[i, 14]),
                     'pred_close_t20': float(pred_close[i, 19]),
                     'true_close_t20': float(true_close[i, 19]),
-                    'pred_close_last': float(pred_close[i, -1]),
-                    'true_close_last': float(true_close[i, -1]),
-                    'pred_close_mean': float(pred_close[i].mean()),
-                    'true_close_mean': float(true_close[i].mean()),
                 })
 
-    all_pred = np.concatenate(all_pred_close, axis=0).flatten()
-    all_true = np.concatenate(all_true_close, axis=0).flatten()
-
-    mse = float(np.mean((all_pred - all_true) ** 2))
-    mae = float(np.mean(np.abs(all_pred - all_true)))
+    start = np.array([r['start_close'] for r in records])
 
     def step_metrics(pred_key, true_key):
         p = np.array([r[pred_key] for r in records])
         t = np.array([r[true_key] for r in records])
         mse_ = float(np.mean((p - t) ** 2))
         mae_ = float(np.mean(np.abs(p - t)))
-        dir_ = float(np.mean(np.sign(p - t) == np.sign(t - t)))  # direction vs context mean=0
-        return mse_, mae_
+        dir_ = float(np.mean(np.sign(p - start) == np.sign(t - start)))
+        return mse_, mae_, dir_
 
-    mse_t15, mae_t15 = step_metrics('pred_close_t15', 'true_close_t15')
-    mse_t20, mae_t20 = step_metrics('pred_close_t20', 'true_close_t20')
-    mse_last, mae_last = step_metrics('pred_close_last', 'true_close_last')
+    steps = [5, 10, 15, 20]
+    metrics = {n: step_metrics(f'pred_close_t{n}', f'true_close_t{n}') for n in steps}
 
     elapsed = time.time() - t0
     total_samples = len(dataset)
     print(f"\nInference time: {elapsed:.1f}s for {total_samples} samples "
           f"({elapsed/total_samples*1000:.1f} ms/sample)")
 
-    print(f"\n{'='*45}")
+    print(f"\n{'='*52}")
     print(f"Evaluation Results (actual price space)")
-    print(f"{'='*45}")
+    print(f"{'='*52}")
     print(f"  Samples : {len(records)}")
-    print(f"  {'':10s}  {'MSE':>12s}  {'MAE':>12s}")
-    print(f"  {'T+15':10s}  {mse_t15:>12.4f}  {mae_t15:>12.4f}")
-    print(f"  {'T+20':10s}  {mse_t20:>12.4f}  {mae_t20:>12.4f}")
-    print(f"  {'T+48(last)':10s}  {mse_last:>12.4f}  {mae_last:>12.4f}")
-    print(f"  {'all steps':10s}  {mse:>12.4f}  {mae:>12.4f}")
-    print(f"{'='*45}")
+    print(f"  {'Step':>6s}  {'MSE':>12s}  {'MAE':>12s}  {'DirAcc':>8s}")
+    print(f"  {'-'*46}")
+    for n in steps:
+        mse_n, mae_n, dir_n = metrics[n]
+        print(f"  {'T+'+str(n):>6s}  {mse_n:>12.4f}  {mae_n:>12.4f}  {dir_n:>8.4f}")
+    print(f"{'='*52}")
 
     results_df = pd.DataFrame(records)
     results_df.to_csv(args.output, index=False)
