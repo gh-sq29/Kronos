@@ -1,13 +1,10 @@
 import logging
-import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import pandas as pd
 
-# Allow importing model from parent repo
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
+# model/ is importable via PYTHONPATH=/kronos set in Dockerfile
 from model import KronosTokenizer, Kronos, KronosPredictor as _KronosPredictor
 
 logger = logging.getLogger(__name__)

@@ -1,0 +1,17 @@
+services:
+  kronos-service:
+    build: .
+    image: kronos-service:latest
+    ports:
+      - "15321:16300"
+    volumes:
+      - .:/app           # service/ → /app  (bind-mount: git pull → restart = deploy)
+      - ../:/kronos:ro   # Kronos/ → /kronos (parent model code, read-only)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped

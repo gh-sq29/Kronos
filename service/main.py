@@ -88,3 +88,8 @@ async def get_stats():
 @app.get("/api/price")
 async def get_price():
     return {"price": binance_ws.get_latest_price()}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
