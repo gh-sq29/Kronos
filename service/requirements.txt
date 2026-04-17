@@ -5,3 +5,6 @@ aiosqlite
 jinja2
 python-multipart
 pandas
+huggingface_hub
+tqdm
+einops
