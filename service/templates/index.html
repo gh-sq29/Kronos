@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kronos · BTCUSDT Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Roboto+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<div class="topbar">
+  <span class="logo">KRONOS</span>
+  <span class="symbol">BTCUSDT Perpetual</span>
+  <span class="price" id="price">—</span>
+  <span class="status">
+    <span class="dot live" id="ws-dot"></span>
+    Live
+  </span>
+</div>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- Chart -->
+  <div class="chart-section">
+    <div class="chart-header">
+      <h2>1-min K-line</h2>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#0ecb81"></div>
+        Actual
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background:#00d4aa; height:2px; border-top:2px dashed #00d4aa; background:none;"></div>
+        Prediction
+      </div>
+    </div>
+    <div id="chart-container"></div>
+    <div class="controls" style="margin-top:8px;">
+      <button class="btn btn-primary" id="predict-btn">Predict Now</button>
+      <span id="predict-msg"></span>
+      <span style="margin-left:auto; color:var(--muted); font-size:11px;">
+        Chart refreshes every 60s · Stats every 30s · Scheduled inference every 1min
+      </span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-section">
+    <h2>Prediction Accuracy Statistics</h2>
+    <div class="stats-grid" id="stats-grid">
+      <!-- Populated by JS -->
+      <div class="stat-card"><div class="window-label">5 min</div><div class="no-data">Collecting data…</div></div>
+      <div class="stat-card"><div class="window-label">10 min</div><div class="no-data">Collecting data…</div></div>
+      <div class="stat-card"><div class="window-label">15 min</div><div class="no-data">Collecting data…</div></div>
+      <div class="stat-card"><div class="window-label">20 min</div><div class="no-data">Collecting data…</div></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Kronos · BTCUSDT USDM Futures · Data: Binance · Model: Kronos-base (local)
+</div>
+
+<script src="/static/main.js"></script>
+</body>
+</html>
