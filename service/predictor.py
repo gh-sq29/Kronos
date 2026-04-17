@@ -1,8 +1,11 @@
+import json
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd
+import torch
+from safetensors.torch import load_file as _safetensors_load
 
 # model/ is importable via PYTHONPATH=/kronos set in Dockerfile
 from model import KronosTokenizer, Kronos, KronosPredictor as _KronosPredictor
@@ -18,12 +21,25 @@ PRED_LEN = 30
 _predictor: _KronosPredictor | None = None
 
 
+def _load_local(cls, path: Path, device: str):
+    """Load a PyTorchModelHubMixin model from a local checkpoint directory."""
+    config = json.loads((path / "config.json").read_text())
+    model = cls(**config)
+    state_dict = _safetensors_load(str(path / "model.safetensors"), device=device)
+    model.load_state_dict(state_dict)
+    return model
+
+
 def load_model():
     global _predictor
     logger.info("Loading Kronos model from local checkpoints...")
-    tokenizer = KronosTokenizer.from_pretrained(str(TOKENIZER_PATH))
-    model = Kronos.from_pretrained(str(PREDICTOR_PATH))
-    _predictor = _KronosPredictor(model, tokenizer, max_context=MAX_CONTEXT)
+    if not torch.cuda.is_available():
+        raise RuntimeError("No CUDA GPU detected. This service requires a GPU.")
+    device = "cuda"
+    logger.info("Using device: %s (CUDA %s)", device, torch.version.cuda)
+    tokenizer = _load_local(KronosTokenizer, TOKENIZER_PATH, device)
+    model = _load_local(Kronos, PREDICTOR_PATH, device)
+    _predictor = _KronosPredictor(model, tokenizer, device=device, max_context=MAX_CONTEXT)
     logger.info("Kronos model loaded on device: %s", _predictor.device)
 
 

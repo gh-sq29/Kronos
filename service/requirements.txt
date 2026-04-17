@@ -8,3 +8,4 @@ pandas
 huggingface_hub
 tqdm
 einops
+safetensors
