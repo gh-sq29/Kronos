@@ -80,6 +80,25 @@ async def latest_prediction():
     return {"predictions": await db.get_latest_prediction()}
 
 
+@app.get("/api/predictions/history")
+async def get_historical_prediction(timestamp: str, tz_offset: float = 8.0):
+    """
+    Return stored predictions for the run matching the given timestamp.
+
+    - timestamp: datetime string in "%Y-%m-%dT%H:%M:%S" format, interpreted in tz_offset timezone
+    - tz_offset: UTC offset in hours, default 8 (UTC+8). Pass 0 for UTC.
+    """
+    from datetime import datetime, timezone, timedelta
+    try:
+        dt = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="timestamp must be in format %Y-%m-%dT%H:%M:%S")
+    dt_utc = dt - timedelta(hours=tz_offset)
+    utc_ms = int(dt_utc.replace(tzinfo=timezone.utc).timestamp() * 1000)
+    preds = await db.get_predictions_by_run_time(utc_ms)
+    return {"predictions": preds}
+
+
 @app.get("/api/stats")
 async def get_stats():
     return {"stats": await db.get_latest_stats()}

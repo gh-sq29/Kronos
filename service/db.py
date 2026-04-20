@@ -122,6 +122,31 @@ async def get_predictions_for_run(run_id: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+async def get_predictions_by_run_time(run_time_ms: int, tolerance_ms: int = 30_000) -> list[dict]:
+    """Return predictions for the run whose run_id timestamp is within tolerance of run_time_ms."""
+    from datetime import datetime, timezone, timedelta
+    lo_dt = datetime.fromtimestamp((run_time_ms - tolerance_ms) / 1000, tz=timezone.utc)
+    hi_dt = datetime.fromtimestamp((run_time_ms + tolerance_ms) / 1000, tz=timezone.utc)
+    # run_id is ISO format UTC string — lexicographic comparison works for same-timezone strings
+    lo_str = lo_dt.isoformat()
+    hi_str = hi_dt.isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT DISTINCT run_id FROM predictions WHERE run_id >= ? AND run_id <= ? ORDER BY run_id LIMIT 1",
+            (lo_str, hi_str),
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            return []
+        run_id = row["run_id"]
+        async with db.execute(
+            "SELECT * FROM predictions WHERE run_id=? ORDER BY bar_time", (run_id,)
+        ) as cur:
+            rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
 async def get_klines_in_range(start_ms: int, end_ms: int) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
