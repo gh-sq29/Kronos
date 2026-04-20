@@ -201,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('predict-btn').addEventListener('click', onPredict);
   document.getElementById('volatility-threshold').addEventListener('change', loadStats);
+  document.getElementById('refresh-stats-btn').addEventListener('click', loadStats);
 
   setInterval(loadChart, CHART_REFRESH_MS);
   setInterval(loadStats, STATS_REFRESH_MS);

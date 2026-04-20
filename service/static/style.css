@@ -187,6 +187,17 @@ body {
   color: var(--muted);
 }
 
+.btn-refresh {
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.btn-refresh:hover { background: rgba(255,255,255,.06); color: var(--text); }
+
 #volatility-threshold {
   width: 52px;
   background: var(--bg);
