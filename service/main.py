@@ -67,7 +67,12 @@ async def predict():
         raise HTTPException(status_code=500, detail=str(e))
 
     _last_predict_time = time.time()
-    return {"predictions": preds}
+    t_kline = klines[-1]
+    return {
+        "predictions": preds,
+        "t_timestamp": t_kline["open_time"],
+        "t_price": t_kline["close"],
+    }
 
 
 @app.get("/api/klines")
