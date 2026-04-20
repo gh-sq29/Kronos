@@ -105,9 +105,10 @@ function dirClass(v) {
   return v >= 0.55 ? 'good' : v <= 0.45 ? 'bad' : '';
 }
 
-function dirBar(long, flat, short) {
-  const lbl = v => (v == null ? '—' : v.toFixed(1) + '%');
-  return `<span class="dir-long">多 ${lbl(long)}</span><span class="dir-flat">波 ${lbl(flat)}</span><span class="dir-short">空 ${lbl(short)}</span>`;
+function dirBar(items) {
+  return items.map(([cls, label, v]) =>
+    `<span class="${cls}">${label} ${v == null ? '—' : v.toFixed(1) + '%'}</span>`
+  ).join('');
 }
 
 function renderStats(stats) {
@@ -127,13 +128,13 @@ function renderStats(stats) {
       const d = s.direction;
       const dirSection = d ? `
         <div class="stat-section-label">预测分布</div>
-        <div class="dir-row">${dirBar(d.pred_long, d.pred_flat, d.pred_short)}</div>
+        <div class="dir-row">${dirBar([['dir-long','多',d.pred_long],['dir-flat-long','波多',d.pred_flat_long],['dir-flat-short','波空',d.pred_flat_short],['dir-short','空',d.pred_short]])}</div>
         <div class="stat-section-label">实际分布</div>
-        <div class="dir-row">${dirBar(d.act_long, d.act_flat, d.act_short)}</div>
+        <div class="dir-row">${dirBar([['dir-long','多',d.act_long],['dir-flat-long','波多',d.act_flat_long],['dir-flat-short','波空',d.act_flat_short],['dir-short','空',d.act_short]])}</div>
         <div class="stat-section-label">预测多 → 实际</div>
-        <div class="dir-row">${dirBar(d.ll, d.lf, d.ls)}</div>
+        <div class="dir-row">${dirBar([['dir-long','多',d.ll],['dir-flat-long','波多',d.lfl],['dir-flat-short','波空',d.lfs],['dir-short','空',d.ls]])}</div>
         <div class="stat-section-label">预测空 → 实际</div>
-        <div class="dir-row">${dirBar(d.sl, d.sf, d.ss)}</div>` : '';
+        <div class="dir-row">${dirBar([['dir-short','空',d.ss],['dir-flat-short','波空',d.sfs],['dir-flat-long','波多',d.sfl],['dir-long','多',d.sl]])}</div>` : '';
       card.innerHTML = `
         <div class="window-label">${w} min</div>
         <div class="stat-row">

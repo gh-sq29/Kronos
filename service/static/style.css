@@ -226,9 +226,10 @@ body {
   font-weight: 600;
 }
 
-.dir-long  { color: var(--green); }
-.dir-short { color: var(--red); }
-.dir-flat  { color: var(--muted); }
+.dir-long       { color: var(--green); }
+.dir-flat-long  { color: #52a08a; }
+.dir-flat-short { color: #a07052; }
+.dir-short      { color: var(--red); }
 
 .stats-grid {
   display: grid;

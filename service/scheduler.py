@@ -37,7 +37,7 @@ async def get_window_pairs(window: int, now_ms: int) -> list[dict]:
 
 
 def compute_direction_breakdown(pairs: list[dict], threshold_pct: float) -> dict | None:
-    """Compute detailed long/short/flat breakdown from prediction-actual pairs."""
+    """Compute detailed long/flat_long/flat_short/short breakdown from prediction-actual pairs."""
     if not pairs:
         return None
 
@@ -46,11 +46,11 @@ def compute_direction_breakdown(pairs: list[dict], threshold_pct: float) -> dict
             return "long"
         if pct_change < -threshold_pct:
             return "short"
-        return "flat"
+        return "flat_long" if pct_change >= 0 else "flat_short"
 
-    pred_counts = {"long": 0, "short": 0, "flat": 0}
-    act_counts  = {"long": 0, "short": 0, "flat": 0}
-    # outcome counts keyed by (pred_dir, act_dir)
+    CATS = ["long", "flat_long", "flat_short", "short"]
+    pred_counts = {c: 0 for c in CATS}
+    act_counts  = {c: 0 for c in CATS}
     outcomes: dict[tuple, int] = {}
 
     for p in pairs:
@@ -67,19 +67,26 @@ def compute_direction_breakdown(pairs: list[dict], threshold_pct: float) -> dict
     def r(v, total):
         return round(v / total * 100, 1) if total else 0.0
 
+    def o(pd, ad):
+        return r(outcomes.get((pd, ad), 0), pred_counts[pd])
+
     return {
-        "pred_long":  r(pl, n),
-        "pred_short": r(ps, n),
-        "pred_flat":  r(pred_counts["flat"], n),
-        "act_long":   r(act_counts["long"], n),
-        "act_short":  r(act_counts["short"], n),
-        "act_flat":   r(act_counts["flat"], n),
-        "ll": r(outcomes.get(("long",  "long"),  0), pl),
-        "lf": r(outcomes.get(("long",  "flat"),  0), pl),
-        "ls": r(outcomes.get(("long",  "short"), 0), pl),
-        "ss": r(outcomes.get(("short", "short"), 0), ps),
-        "sf": r(outcomes.get(("short", "flat"),  0), ps),
-        "sl": r(outcomes.get(("short", "long"),  0), ps),
+        "pred_long":       r(pl, n),
+        "pred_flat_long":  r(pred_counts["flat_long"], n),
+        "pred_flat_short": r(pred_counts["flat_short"], n),
+        "pred_short":      r(ps, n),
+        "act_long":        r(act_counts["long"], n),
+        "act_flat_long":   r(act_counts["flat_long"], n),
+        "act_flat_short":  r(act_counts["flat_short"], n),
+        "act_short":       r(act_counts["short"], n),
+        "ll":  o("long",  "long"),
+        "lfl": o("long",  "flat_long"),
+        "lfs": o("long",  "flat_short"),
+        "ls":  o("long",  "short"),
+        "ss":  o("short", "short"),
+        "sfs": o("short", "flat_short"),
+        "sfl": o("short", "flat_long"),
+        "sl":  o("short", "long"),
     }
 
 
