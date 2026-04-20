@@ -112,8 +112,8 @@ function dirBar(items) {
   ).join('');
 }
 
-function renderStats(stats) {
-  const grid = document.getElementById('stats-grid');
+function renderStats(stats, gridId = 'stats-grid') {
+  const grid = document.getElementById(gridId);
   grid.innerHTML = '';
   for (const w of [5, 10, 15, 20]) {
     const s = stats[w];
@@ -165,6 +165,32 @@ function renderStats(stats) {
   }
 }
 
+// ── Historical stats ─────────────────────────────────────────
+function fmtLocalDatetime(date) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+async function loadHistoricalStats() {
+  const start = document.getElementById('hist-start').value;
+  const end   = document.getElementById('hist-end').value;
+  const status = document.getElementById('hist-status');
+  if (!start || !end) { status.textContent = '请填写起止时间'; return; }
+  if (start >= end)   { status.textContent = '结束时间须晚于开始时间'; return; }
+  status.textContent = '查询中…';
+  const threshold    = parseFloat(document.getElementById('hist-volatility-threshold').value) || 0.5;
+  const actThreshold = parseFloat(document.getElementById('hist-act-volatility-threshold').value) || 0.1;
+  try {
+    const res = await fetch(`/api/stats/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&threshold=${threshold}&act_threshold=${actThreshold}`);
+    if (!res.ok) { const d = await res.json(); status.textContent = '查询失败: ' + (d.detail || res.status); return; }
+    const { stats } = await res.json();
+    renderStats(stats, 'hist-stats-grid');
+    status.textContent = `查询成功 · ${start} ~ ${end}`;
+  } catch (e) {
+    status.textContent = '查询失败: ' + e;
+  }
+}
+
 // ── Predict button ───────────────────────────────────────────
 async function onPredict() {
   const btn = document.getElementById('predict-btn');
@@ -201,6 +227,11 @@ document.addEventListener('DOMContentLoaded', () => {
   loadChart();
   loadStats();
   loadPrice();
+
+  const now = new Date();
+  document.getElementById('hist-end').value   = fmtLocalDatetime(now);
+  document.getElementById('hist-start').value = fmtLocalDatetime(new Date(now - 2 * 3600 * 1000));
+  document.getElementById('hist-query-btn').addEventListener('click', loadHistoricalStats);
 
   document.getElementById('predict-btn').addEventListener('click', onPredict);
   document.getElementById('volatility-threshold').addEventListener('change', loadStats);

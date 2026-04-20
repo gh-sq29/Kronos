@@ -73,6 +73,33 @@
     </div>
   </div>
 
+  <!-- Historical Stats -->
+  <div class="stats-section">
+    <div class="stats-header">
+      <h2>历史统计查询</h2>
+      <label class="threshold-label">开始 <input type="datetime-local" id="hist-start" class="hist-input"></label>
+      <label class="threshold-label">结束 <input type="datetime-local" id="hist-end" class="hist-input"></label>
+      <label class="threshold-label">
+        预测波动幅度
+        <input type="number" id="hist-volatility-threshold" value="0.5" min="0.01" max="10" step="0.1" style="width:52px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;">
+        %
+      </label>
+      <label class="threshold-label">
+        实际波动幅度
+        <input type="number" id="hist-act-volatility-threshold" value="0.1" min="0.01" max="10" step="0.1" style="width:52px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;">
+        %
+      </label>
+      <button class="btn btn-refresh" id="hist-query-btn">查询</button>
+    </div>
+    <div id="hist-status" style="color:var(--muted);font-size:12px;padding:4px 0;min-height:18px;"></div>
+    <div class="stats-grid" id="hist-stats-grid">
+      <div class="stat-card"><div class="window-label">5 min</div><div class="no-data">请选择时间范围后查询</div></div>
+      <div class="stat-card"><div class="window-label">10 min</div><div class="no-data">请选择时间范围后查询</div></div>
+      <div class="stat-card"><div class="window-label">15 min</div><div class="no-data">请选择时间范围后查询</div></div>
+      <div class="stat-card"><div class="window-label">20 min</div><div class="no-data">请选择时间范围后查询</div></div>
+    </div>
+  </div>
+
 </div>
 
 <div class="footer">

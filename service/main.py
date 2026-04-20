@@ -118,6 +118,38 @@ async def get_stats(threshold: float = 0.5, act_threshold: float = 0.1):
     return {"stats": base, "threshold": threshold, "act_threshold": act_threshold}
 
 
+@app.get("/api/stats/range")
+async def get_stats_range(start: str, end: str, threshold: float = 0.5, act_threshold: float = 0.1):
+    """
+    Compute stats for a custom time range.
+    start/end: local datetime strings (UTC+8), e.g. "2025-01-01T12:00" or "2025-01-01T12:00:00".
+    """
+    from datetime import datetime, timezone, timedelta
+    try:
+        start_dt = datetime.fromisoformat(start) - timedelta(hours=8)
+        end_dt   = datetime.fromisoformat(end)   - timedelta(hours=8)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="datetime must be ISO format, e.g. 2025-01-01T12:00")
+    start_ms = int(start_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
+    end_ms   = int(end_dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
+    result = {}
+    for w in [5, 10, 15, 20]:
+        pairs = await scheduler.get_window_pairs_for_range(w, start_ms, end_ms)
+        breakdown = scheduler.compute_direction_breakdown(pairs, threshold, act_threshold)
+        if pairs:
+            errors = [p["err"] for p in pairs]
+            result[w] = {
+                "mae": sum(errors) / len(errors),
+                "max_deviation": max(errors),
+                "min_deviation": min(errors),
+                "sample_count": len(pairs),
+                "direction": breakdown,
+            }
+        else:
+            result[w] = None
+    return {"stats": result, "threshold": threshold, "act_threshold": act_threshold}
+
+
 @app.get("/api/price")
 async def get_price():
     return {"price": binance_ws.get_latest_price()}

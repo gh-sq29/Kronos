@@ -36,6 +36,32 @@ async def get_window_pairs(window: int, now_ms: int) -> list[dict]:
     return pairs
 
 
+async def get_window_pairs_for_range(window: int, start_ms: int, end_ms: int) -> list[dict]:
+    """Like get_window_pairs but queries runs within [start_ms, end_ms]."""
+    cutoff_ms = end_ms - window * 60 * 1000
+    runs = await db.get_prediction_runs_in_range(start_ms, end_ms)
+    runs = [r for r in runs if _run_id_to_ms(r) <= cutoff_ms]
+
+    pairs = []
+    for run_id in runs:
+        preds = await db.get_predictions_for_run(run_id)
+        if len(preds) < window:
+            continue
+        pred = preds[window - 1]
+        actual_list = await db.get_klines_in_range(pred["bar_time"], pred["bar_time"])
+        actual = actual_list[0] if actual_list else None
+        if actual is None:
+            continue
+        run_start_ms = _run_id_to_ms(run_id)
+        prev_actuals = await db.get_klines_in_range(run_start_ms - 2 * 60 * 1000, run_start_ms)
+        prev_close = prev_actuals[-1]["close"] if prev_actuals else None
+        if not prev_close:
+            continue
+        pairs.append({"pred_close": pred["close"], "actual_close": actual["close"],
+                      "prev_close": prev_close, "err": abs(pred["close"] - actual["close"])})
+    return pairs
+
+
 def compute_direction_breakdown(pairs: list[dict], pred_threshold_pct: float, act_threshold_pct: float) -> dict | None:
     """Compute detailed long/flat_long/flat_short/short breakdown from prediction-actual pairs."""
     if not pairs:

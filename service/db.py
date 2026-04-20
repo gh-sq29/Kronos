@@ -147,6 +147,20 @@ async def get_predictions_by_run_time(run_time_ms: int, tolerance_ms: int = 30_0
     return [dict(r) for r in rows]
 
 
+async def get_prediction_runs_in_range(start_ms: int, end_ms: int) -> list[str]:
+    from datetime import datetime, timezone
+    lo = datetime.fromtimestamp(start_ms / 1000, tz=timezone.utc).isoformat()
+    hi = datetime.fromtimestamp(end_ms / 1000, tz=timezone.utc).isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT DISTINCT run_id FROM predictions WHERE run_id >= ? AND run_id <= ? ORDER BY run_id",
+            (lo, hi),
+        ) as cur:
+            rows = await cur.fetchall()
+    return [r["run_id"] for r in rows]
+
+
 async def get_klines_in_range(start_ms: int, end_ms: int) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
