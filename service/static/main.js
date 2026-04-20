@@ -38,7 +38,7 @@ function initChart() {
 }
 
 function toChartTime(ms) {
-  return Math.floor(ms / 1000);
+  return Math.floor(ms / 1000) + 8 * 3600;
 }
 
 // ── Data loaders ────────────────────────────────────────────
