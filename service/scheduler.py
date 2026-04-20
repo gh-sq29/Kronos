@@ -26,31 +26,26 @@ async def compute_stats(window: int, now_ms: int):
 
     for run_id in runs:
         preds = await db.get_predictions_for_run(run_id)
-        if not preds:
+        if len(preds) < window:
             continue
-        target_bars = preds[:window]
-        bar_times = [p["bar_time"] for p in target_bars]
-        actuals = await db.get_klines_in_range(bar_times[0], bar_times[-1])
-        actual_map = {a["open_time"]: a for a in actuals}
+        pred = preds[window - 1]  # single point: T+window
+        actual_list = await db.get_klines_in_range(pred["bar_time"], pred["bar_time"])
+        actual = actual_list[0] if actual_list else None
+        if actual is None:
+            continue
 
-        # Use the last actual kline before the run as prev_close reference
+        err = abs(pred["close"] - actual["close"])
+        all_errors.append(err)
+
+        # Direction vs start of run (T+0)
         run_start_ms = _run_id_to_ms(run_id)
         prev_actuals = await db.get_klines_in_range(run_start_ms - 2 * 60 * 1000, run_start_ms)
         prev_close = prev_actuals[-1]["close"] if prev_actuals else None
-
-        for i, pred in enumerate(target_bars):
-            actual = actual_map.get(pred["bar_time"])
-            if actual is None:
-                continue
-            err = abs(pred["close"] - actual["close"])
-            all_errors.append(err)
-
-            ref_close = (target_bars[i - 1]["close"] if i > 0 else prev_close)
-            if ref_close is not None:
-                pred_dir = pred["close"] - ref_close
-                act_dir = actual["close"] - ref_close
-                if pred_dir != 0 and act_dir != 0:
-                    all_dir_correct.append(1 if (pred_dir > 0) == (act_dir > 0) else 0)
+        if prev_close is not None:
+            pred_dir = pred["close"] - prev_close
+            act_dir = actual["close"] - prev_close
+            if pred_dir != 0 and act_dir != 0:
+                all_dir_correct.append(1 if (pred_dir > 0) == (act_dir > 0) else 0)
 
     if not all_errors:
         return
