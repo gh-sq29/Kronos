@@ -124,10 +124,10 @@ function renderStats(stats) {
         <div class="window-label">${w} min</div>
         <div class="no-data">Collecting data…</div>`;
     } else {
+      const d = s.direction;
       const daVal = d ? d.dir_acc : (s.direction_accuracy != null ? s.direction_accuracy * 100 : null);
       const da = daVal != null ? daVal.toFixed(1) + '%' : '—';
       const daCls = daVal != null ? (daVal >= 55 ? 'good' : daVal <= 45 ? 'bad' : '') : '';
-      const d = s.direction;
       const dirSection = d ? `
         <div class="stat-section-label">预测分布</div>
         <div class="dir-row">${dirBar([['dir-long','多',d.pred_long],['dir-flat-long','波多',d.pred_flat_long],['dir-flat-short','波空',d.pred_flat_short],['dir-short','空',d.pred_short]])}</div>
