@@ -100,8 +100,17 @@ async def get_historical_prediction(timestamp: str, tz_offset: float = 8.0):
 
 
 @app.get("/api/stats")
-async def get_stats():
-    return {"stats": await db.get_latest_stats()}
+async def get_stats(threshold: float = 0.5):
+    now_ms = int(time.time() * 1000)
+    base = await db.get_latest_stats()
+    for w in [5, 10, 15, 20]:
+        pairs = await scheduler.get_window_pairs(w, now_ms)
+        breakdown = scheduler.compute_direction_breakdown(pairs, threshold)
+        if base[w] is not None:
+            base[w]["direction"] = breakdown
+        elif breakdown:
+            base[w] = {"direction": breakdown}
+    return {"stats": base, "threshold": threshold}
 
 
 @app.get("/api/price")

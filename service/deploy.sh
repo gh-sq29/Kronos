@@ -40,11 +40,12 @@ check_deps() {
 # ── 健康检查 ─────────────────────────────────────────────────────────────────
 
 wait_healthy() {
-    log_info "等待服务就绪（最多 180 秒，GPU 模型加载需要时间）..."
+    local timeout="${WAIT_TIMEOUT:-600}"
+    log_info "等待服务就绪（最多 ${timeout} 秒，GPU 模型加载需要时间）..."
     local elapsed=0
-    until curl -sf "${API_BASE}/health" &>/dev/null; do
-        if [ $elapsed -ge 180 ]; then
-            log_error "服务未能在 180 秒内启动，查看最近日志："
+    until curl -s "${API_BASE}/health" &>/dev/null; do
+        if [ $elapsed -ge "$timeout" ]; then
+            log_error "服务未能在 ${timeout} 秒内启动，查看最近日志："
             $COMPOSE logs --tail=40
             exit 1
         fi

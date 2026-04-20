@@ -50,7 +50,14 @@
 
   <!-- Stats -->
   <div class="stats-section">
-    <h2>Prediction Accuracy Statistics</h2>
+    <div class="stats-header">
+      <h2>Prediction Accuracy Statistics</h2>
+      <label class="threshold-label">
+        波动幅度
+        <input type="number" id="volatility-threshold" value="0.5" min="0.01" max="10" step="0.1">
+        %
+      </label>
+    </div>
     <div class="stats-grid" id="stats-grid">
       <!-- Populated by JS -->
       <div class="stat-card"><div class="window-label">5 min</div><div class="no-data">Collecting data…</div></div>

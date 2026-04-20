@@ -11,52 +11,100 @@ logger = logging.getLogger(__name__)
 WINDOWS = [5, 10, 15, 20]
 
 
-async def compute_stats(window: int, now_ms: int):
-    """Compare past predictions against actual klines for a given window."""
-    # Only consider runs old enough that `window` actual bars have closed
+async def get_window_pairs(window: int, now_ms: int) -> list[dict]:
+    """Return (pred_close, actual_close, prev_close) pairs for a given window."""
     cutoff_ms = now_ms - window * 60 * 1000
-    runs = await db.get_prediction_runs_since(now_ms - 2 * 60 * 60 * 1000)  # last 2h
+    runs = await db.get_prediction_runs_since(now_ms - 2 * 60 * 60 * 1000)
     runs = [r for r in runs if _run_id_to_ms(r) <= cutoff_ms]
 
-    if not runs:
-        return
-
-    all_errors = []
-    all_dir_correct = []
-
+    pairs = []
     for run_id in runs:
         preds = await db.get_predictions_for_run(run_id)
         if len(preds) < window:
             continue
-        pred = preds[window - 1]  # single point: T+window
+        pred = preds[window - 1]
         actual_list = await db.get_klines_in_range(pred["bar_time"], pred["bar_time"])
         actual = actual_list[0] if actual_list else None
         if actual is None:
             continue
-
-        err = abs(pred["close"] - actual["close"])
-        all_errors.append(err)
-
-        # Direction vs start of run (T+0)
         run_start_ms = _run_id_to_ms(run_id)
         prev_actuals = await db.get_klines_in_range(run_start_ms - 2 * 60 * 1000, run_start_ms)
         prev_close = prev_actuals[-1]["close"] if prev_actuals else None
-        if prev_close is not None:
-            pred_dir = pred["close"] - prev_close
-            act_dir = actual["close"] - prev_close
-            if pred_dir != 0 and act_dir != 0:
-                all_dir_correct.append(1 if (pred_dir > 0) == (act_dir > 0) else 0)
+        if not prev_close:
+            continue
+        pairs.append({"pred_close": pred["close"], "actual_close": actual["close"], "prev_close": prev_close, "err": abs(pred["close"] - actual["close"])})
+    return pairs
 
-    if not all_errors:
+
+def compute_direction_breakdown(pairs: list[dict], threshold_pct: float) -> dict | None:
+    """Compute detailed long/short/flat breakdown from prediction-actual pairs."""
+    if not pairs:
+        return None
+
+    def classify(pct_change):
+        if pct_change > threshold_pct:
+            return "long"
+        if pct_change < -threshold_pct:
+            return "short"
+        return "flat"
+
+    pred_counts = {"long": 0, "short": 0, "flat": 0}
+    act_counts  = {"long": 0, "short": 0, "flat": 0}
+    # outcome counts keyed by (pred_dir, act_dir)
+    outcomes: dict[tuple, int] = {}
+
+    for p in pairs:
+        prev = p["prev_close"]
+        pd = classify((p["pred_close"] - prev) / prev * 100)
+        ad = classify((p["actual_close"] - prev) / prev * 100)
+        pred_counts[pd] += 1
+        act_counts[ad] += 1
+        outcomes[(pd, ad)] = outcomes.get((pd, ad), 0) + 1
+
+    n = len(pairs)
+    pl, ps = pred_counts["long"], pred_counts["short"]
+
+    def r(v, total):
+        return round(v / total * 100, 1) if total else 0.0
+
+    return {
+        "pred_long":  r(pl, n),
+        "pred_short": r(ps, n),
+        "pred_flat":  r(pred_counts["flat"], n),
+        "act_long":   r(act_counts["long"], n),
+        "act_short":  r(act_counts["short"], n),
+        "act_flat":   r(act_counts["flat"], n),
+        "ll": r(outcomes.get(("long",  "long"),  0), pl),
+        "lf": r(outcomes.get(("long",  "flat"),  0), pl),
+        "ls": r(outcomes.get(("long",  "short"), 0), pl),
+        "ss": r(outcomes.get(("short", "short"), 0), ps),
+        "sf": r(outcomes.get(("short", "flat"),  0), ps),
+        "sl": r(outcomes.get(("short", "long"),  0), ps),
+    }
+
+
+async def compute_stats(window: int, now_ms: int):
+    """Compare past predictions against actual klines for a given window."""
+    pairs = await get_window_pairs(window, now_ms)
+    if not pairs:
         return
 
-    mae = sum(all_errors) / len(all_errors)
-    max_dev = max(all_errors)
-    min_dev = min(all_errors)
-    dir_acc = sum(all_dir_correct) / len(all_dir_correct) if all_dir_correct else 0.0
+    errors = [p["err"] for p in pairs]
+    mae = sum(errors) / len(errors)
+    max_dev = max(errors)
+    min_dev = min(errors)
 
-    await db.insert_stats(now_ms, window, mae, max_dev, min_dev, dir_acc, len(all_errors))
-    logger.debug("Stats window=%d mae=%.4f dir_acc=%.2f n=%d", window, mae, dir_acc, len(all_errors))
+    # Legacy direction accuracy (no threshold)
+    dir_correct = []
+    for p in pairs:
+        pd = p["pred_close"] - p["prev_close"]
+        ad = p["actual_close"] - p["prev_close"]
+        if pd != 0 and ad != 0:
+            dir_correct.append(1 if (pd > 0) == (ad > 0) else 0)
+    dir_acc = sum(dir_correct) / len(dir_correct) if dir_correct else 0.0
+
+    await db.insert_stats(now_ms, window, mae, max_dev, min_dev, dir_acc, len(errors))
+    logger.debug("Stats window=%d mae=%.4f dir_acc=%.2f n=%d", window, mae, dir_acc, len(errors))
 
 
 def _run_id_to_ms(run_id: str) -> int:

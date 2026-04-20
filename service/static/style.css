@@ -166,12 +166,58 @@ body {
   padding: 10px 12px;
 }
 
+.stats-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
 .stats-section h2 {
   font-size: 13px;
   font-weight: 600;
-  margin-bottom: 10px;
   color: var(--text);
 }
+
+.threshold-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+#volatility-threshold {
+  width: 52px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 11px;
+  font-family: 'Roboto Mono', monospace;
+}
+
+.stat-section-label {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 7px;
+  padding-top: 5px;
+  border-top: 1px solid var(--border);
+  margin-bottom: 3px;
+}
+
+.dir-row {
+  display: flex;
+  gap: 8px;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dir-long  { color: var(--green); }
+.dir-short { color: var(--red); }
+.dir-flat  { color: var(--muted); }
 
 .stats-grid {
   display: grid;

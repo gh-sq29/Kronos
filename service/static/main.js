@@ -73,7 +73,8 @@ async function loadChart() {
 
 async function loadStats() {
   try {
-    const res = await fetch('/api/stats');
+    const threshold = parseFloat(document.getElementById('volatility-threshold').value) || 0.5;
+    const res = await fetch(`/api/stats?threshold=${threshold}`);
     const { stats } = await res.json();
     renderStats(stats);
   } catch (e) {
@@ -104,6 +105,11 @@ function dirClass(v) {
   return v >= 0.55 ? 'good' : v <= 0.45 ? 'bad' : '';
 }
 
+function dirBar(long, flat, short) {
+  const lbl = v => (v == null ? '—' : v.toFixed(1) + '%');
+  return `<span class="dir-long">多 ${lbl(long)}</span><span class="dir-flat">波 ${lbl(flat)}</span><span class="dir-short">空 ${lbl(short)}</span>`;
+}
+
 function renderStats(stats) {
   const grid = document.getElementById('stats-grid');
   grid.innerHTML = '';
@@ -118,6 +124,16 @@ function renderStats(stats) {
     } else {
       const da = s.direction_accuracy != null ? (s.direction_accuracy * 100).toFixed(1) + '%' : '—';
       const daCls = dirClass(s.direction_accuracy);
+      const d = s.direction;
+      const dirSection = d ? `
+        <div class="stat-section-label">预测分布</div>
+        <div class="dir-row">${dirBar(d.pred_long, d.pred_flat, d.pred_short)}</div>
+        <div class="stat-section-label">实际分布</div>
+        <div class="dir-row">${dirBar(d.act_long, d.act_flat, d.act_short)}</div>
+        <div class="stat-section-label">预测多 → 实际</div>
+        <div class="dir-row">${dirBar(d.ll, d.lf, d.ls)}</div>
+        <div class="stat-section-label">预测空 → 实际</div>
+        <div class="dir-row">${dirBar(d.sl, d.sf, d.ss)}</div>` : '';
       card.innerHTML = `
         <div class="window-label">${w} min</div>
         <div class="stat-row">
@@ -137,9 +153,10 @@ function renderStats(stats) {
           <span class="value ${daCls}">${da}</span>
         </div>
         <div class="stat-row">
-          <span class="label">Sample bars</span>
+          <span class="label">样本数</span>
           <span class="value">${s.sample_count ?? '—'}</span>
-        </div>`;
+        </div>
+        ${dirSection}`;
     }
     grid.appendChild(card);
   }
@@ -183,6 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadPrice();
 
   document.getElementById('predict-btn').addEventListener('click', onPredict);
+  document.getElementById('volatility-threshold').addEventListener('change', loadStats);
 
   setInterval(loadChart, CHART_REFRESH_MS);
   setInterval(loadStats, STATS_REFRESH_MS);
