@@ -610,6 +610,9 @@ def predict():
         except Exception as e:
             print(f"Failed to save prediction results: {e}")
         
+        t_timestamp = x_timestamp.iloc[-1]
+        t_price = float(x_df.iloc[-1]['close'])
+
         return jsonify({
             'success': True,
             'prediction_type': prediction_type,
@@ -617,6 +620,8 @@ def predict():
             'prediction_results': prediction_results,
             'actual_data': actual_data,
             'has_comparison': len(actual_data) > 0,
+            't_timestamp': t_timestamp.isoformat() if hasattr(t_timestamp, 'isoformat') else str(t_timestamp),
+            't_price': t_price,
             'message': f'Prediction completed, generated {pred_len} prediction points' + (f', including {len(actual_data)} actual data points for comparison' if len(actual_data) > 0 else '')
         })
         
