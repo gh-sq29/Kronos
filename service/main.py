@@ -110,7 +110,7 @@ async def get_stats(threshold: float = 0.5, act_threshold: float = 0.1):
     base = await db.get_latest_stats()
     for w in [5, 10, 15, 20]:
         pairs = await scheduler.get_window_pairs(w, now_ms)
-        breakdown = scheduler.compute_direction_breakdown(pairs, threshold, act_threshold)
+        breakdown = scheduler.compute_direction_breakdown(pairs, threshold, act_threshold, compute_dedup=(w == 20))
         if base[w] is not None:
             base[w]["direction"] = breakdown
         elif breakdown:
@@ -135,7 +135,7 @@ async def get_stats_range(start: str, end: str, threshold: float = 0.5, act_thre
     result = {}
     for w in [5, 10, 15, 20]:
         pairs = await scheduler.get_window_pairs_for_range(w, start_ms, end_ms)
-        breakdown = scheduler.compute_direction_breakdown(pairs, threshold, act_threshold)
+        breakdown = scheduler.compute_direction_breakdown(pairs, threshold, act_threshold, compute_dedup=(w == 20))
         if pairs:
             errors = [p["err"] for p in pairs]
             result[w] = {

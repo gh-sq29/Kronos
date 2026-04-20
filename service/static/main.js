@@ -136,7 +136,12 @@ function renderStats(stats, gridId = 'stats-grid') {
         <div class="stat-section-label">预测多 → 实际</div>
         <div class="dir-row">${dirBar([['dir-long','多',d.ll],['dir-flat-long','波多',d.lfl],['dir-flat-short','波空',d.lfs],['dir-short','空',d.ls]])}</div>
         <div class="stat-section-label">预测空 → 实际</div>
-        <div class="dir-row">${dirBar([['dir-short','空',d.ss],['dir-flat-short','波空',d.sfs],['dir-flat-long','波多',d.sfl],['dir-long','多',d.sl]])}</div>` : '';
+        <div class="dir-row">${dirBar([['dir-short','空',d.ss],['dir-flat-short','波空',d.sfs],['dir-flat-long','波多',d.sfl],['dir-long','多',d.sl]])}</div>
+        ${w === 20 ? `
+        <div class="stat-section-label">去重预测多 → 实际（延展跨度）</div>
+        <div class="dir-row">${dirBar([['dir-long','多',d.dedup_ll],['dir-flat-long','波多',d.dedup_lfl],['dir-flat-short','波空',d.dedup_lfs],['dir-short','空',d.dedup_ls]])}</div>
+        <div class="stat-section-label">去重预测空 → 实际（延展跨度）</div>
+        <div class="dir-row">${dirBar([['dir-short','空',d.dedup_ss],['dir-flat-short','波空',d.dedup_sfs],['dir-flat-long','波多',d.dedup_sfl],['dir-long','多',d.dedup_sl]])}</div>` : ''}` : '';
       card.innerHTML = `
         <div class="window-label">${w} min</div>
         <div class="stat-row">
@@ -164,10 +169,11 @@ function renderStats(stats, gridId = 'stats-grid') {
           <span class="label">预测多 / 空</span>
           <span class="value"><span class="dir-long">${d.pred_long_count ?? '—'}</span> / <span class="dir-short">${d.pred_short_count ?? '—'}</span></span>
         </div>
+        ${w === 20 ? `
         <div class="stat-row">
           <span class="label">去重多 / 空</span>
           <span class="value"><span class="dir-long">${d.dedup_long_count ?? '—'}</span> / <span class="dir-short">${d.dedup_short_count ?? '—'}</span></span>
-        </div>` : ''}
+        </div>` : ''}` : ''}
         ${dirSection}`;
     }
     grid.appendChild(card);
