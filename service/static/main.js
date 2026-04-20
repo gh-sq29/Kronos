@@ -159,6 +159,11 @@ function renderStats(stats, gridId = 'stats-grid') {
           <span class="label">样本数</span>
           <span class="value">${s.sample_count ?? '—'}</span>
         </div>
+        ${d ? `
+        <div class="stat-row">
+          <span class="label">预测多 / 空</span>
+          <span class="value"><span class="dir-long">${d.pred_long_count ?? '—'}</span> / <span class="dir-short">${d.pred_short_count ?? '—'}</span></span>
+        </div>` : ''}
         ${dirSection}`;
     }
     grid.appendChild(card);

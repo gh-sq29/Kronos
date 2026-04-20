@@ -102,6 +102,8 @@ def compute_direction_breakdown(pairs: list[dict], pred_threshold_pct: float, ac
 
     return {
         "dir_acc": round((ll_count + ss_count) / directional * 100, 1) if directional else None,
+        "pred_long_count":  pl,
+        "pred_short_count": ps,
         "pred_long":       r(pl, n),
         "pred_flat_long":  r(pred_counts["flat_long"], n),
         "pred_flat_short": r(pred_counts["flat_short"], n),
