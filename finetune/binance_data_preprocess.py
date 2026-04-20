@@ -19,10 +19,11 @@ class BinanceConfig:
 
     feature_list = ['open', 'high', 'low', 'close', 'vol', 'amt']
 
-    # Time splits — overlap by lookback_window to avoid cold-start gaps.
-    train_time_range = ["2020-01-01", "2023-12-31"]
-    val_time_range   = ["2023-09-01", "2024-06-30"]
-    test_time_range  = ["2024-04-01", "2025-06-05"]
+    # Per-year split boundaries (month numbers, inclusive).
+    # Each year: Jan–Aug → train, Sep–Oct → valid, Nov–Dec → test.
+    train_months = range(1, 9)   # 1–8
+    val_months   = range(9, 11)  # 9–10
+    test_months  = range(11, 13) # 11–12
 
 
 # Binance kline CSV column positions (no header row in the file).
@@ -124,21 +125,35 @@ class BinanceDataPreprocessor:
         print(f"Loaded {len(symbol_df):,} rows for {self.config.symbol}.")
 
     def prepare_dataset(self):
-        """Splits data into train/val/test by time range and saves as pickle files."""
+        """Splits data per-year into train/val/test and saves as pickle files.
+
+        Each calendar year is split by month:
+          train: Jan–Aug (months 1–8)
+          val:   Sep–Oct (months 9–10)
+          test:  Nov–Dec (months 11–12)
+        All years are then concatenated into the respective splits.
+        """
         if not self.data:
             raise RuntimeError("No data loaded. Call load_data() first.")
 
-        print("Splitting into train / val / test ...")
+        print("Splitting into train / val / test (per-year) ...")
         train_data, val_data, test_data = {}, {}, {}
 
         for symbol, df in tqdm(self.data.items(), desc="Preparing datasets"):
-            train_start, train_end = self.config.train_time_range
-            val_start,   val_end   = self.config.val_time_range
-            test_start,  test_end  = self.config.test_time_range
+            years = sorted(df.index.year.unique())
+            print(f"  {symbol}: {years[0]}–{years[-1]}, {len(df):,} rows total")
 
-            train_data[symbol] = df[(df.index >= train_start) & (df.index <= train_end)]
-            val_data[symbol]   = df[(df.index >= val_start)   & (df.index <= val_end)]
-            test_data[symbol]  = df[(df.index >= test_start)  & (df.index <= test_end)]
+            train_frames, val_frames, test_frames = [], [], []
+            for year in years:
+                year_df = df[df.index.year == year]
+                month = year_df.index.month
+                train_frames.append(year_df[month.isin(self.config.train_months)])
+                val_frames.append(year_df[month.isin(self.config.val_months)])
+                test_frames.append(year_df[month.isin(self.config.test_months)])
+
+            train_data[symbol] = pd.concat(train_frames)
+            val_data[symbol]   = pd.concat(val_frames)
+            test_data[symbol]  = pd.concat(test_frames)
 
         os.makedirs(self.config.dataset_path, exist_ok=True)
         for name, split in [("train", train_data), ("val", val_data), ("test", test_data)]:

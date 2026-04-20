@@ -20,13 +20,15 @@ class BinanceDataFetcher:
         symbol: str = "BTCUSDT",
         interval: str = "1m",
         start_date: str = "2020-01-01",
-        end_date: str = "2025-06-05",
+        end_date: str | None = None,
         save_dir: str = "./data/binance_raw",
     ):
         self.symbol = symbol
         self.interval = interval
         self.start_date = datetime.date.fromisoformat(start_date)
-        self.end_date = datetime.date.fromisoformat(end_date)
+        # Default to yesterday — Binance publishes daily files with a 1-day lag.
+        yesterday = datetime.date.today() - datetime.timedelta(days=1)
+        self.end_date = datetime.date.fromisoformat(end_date) if end_date else yesterday
         self.save_dir = os.path.join(save_dir, symbol, interval)
         os.makedirs(self.save_dir, exist_ok=True)
 
@@ -96,7 +98,6 @@ if __name__ == "__main__":
         symbol="BTCUSDT",
         interval="1m",
         start_date="2020-01-01",
-        end_date="2025-06-05",
         save_dir="./data/binance_raw",
     )
     fetcher.fetch_all()
