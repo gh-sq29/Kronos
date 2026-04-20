@@ -175,8 +175,10 @@ async function loadHistoricalStats() {
   const start = document.getElementById('hist-start').value;
   const end   = document.getElementById('hist-end').value;
   const status = document.getElementById('hist-status');
+  const btn    = document.getElementById('hist-query-btn');
   if (!start || !end) { status.textContent = '请填写起止时间'; return; }
   if (start >= end)   { status.textContent = '结束时间须晚于开始时间'; return; }
+  btn.disabled = true;
   status.textContent = '查询中…';
   const threshold    = parseFloat(document.getElementById('hist-volatility-threshold').value) || 0.5;
   const actThreshold = parseFloat(document.getElementById('hist-act-volatility-threshold').value) || 0.1;
@@ -188,6 +190,8 @@ async function loadHistoricalStats() {
     status.textContent = `查询成功 · ${start} ~ ${end}`;
   } catch (e) {
     status.textContent = '查询失败: ' + e;
+  } finally {
+    btn.disabled = false;
   }
 }
 
