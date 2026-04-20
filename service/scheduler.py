@@ -36,15 +36,15 @@ async def get_window_pairs(window: int, now_ms: int) -> list[dict]:
     return pairs
 
 
-def compute_direction_breakdown(pairs: list[dict], threshold_pct: float) -> dict | None:
+def compute_direction_breakdown(pairs: list[dict], pred_threshold_pct: float, act_threshold_pct: float) -> dict | None:
     """Compute detailed long/flat_long/flat_short/short breakdown from prediction-actual pairs."""
     if not pairs:
         return None
 
-    def classify(pct_change):
-        if pct_change > threshold_pct:
+    def classify(pct_change, thr):
+        if pct_change > thr:
             return "long"
-        if pct_change < -threshold_pct:
+        if pct_change < -thr:
             return "short"
         return "flat_long" if pct_change >= 0 else "flat_short"
 
@@ -55,8 +55,8 @@ def compute_direction_breakdown(pairs: list[dict], threshold_pct: float) -> dict
 
     for p in pairs:
         prev = p["prev_close"]
-        pd = classify((p["pred_close"] - prev) / prev * 100)
-        ad = classify((p["actual_close"] - prev) / prev * 100)
+        pd = classify((p["pred_close"] - prev) / prev * 100, pred_threshold_pct)
+        ad = classify((p["actual_close"] - prev) / prev * 100, act_threshold_pct)
         pred_counts[pd] += 1
         act_counts[ad] += 1
         outcomes[(pd, ad)] = outcomes.get((pd, ad), 0) + 1
@@ -70,7 +70,12 @@ def compute_direction_breakdown(pairs: list[dict], threshold_pct: float) -> dict
     def o(pd, ad):
         return r(outcomes.get((pd, ad), 0), pred_counts[pd])
 
+    ll_count = outcomes.get(("long", "long"), 0)
+    ss_count = outcomes.get(("short", "short"), 0)
+    directional = pl + ps
+
     return {
+        "dir_acc": round((ll_count + ss_count) / directional * 100, 1) if directional else None,
         "pred_long":       r(pl, n),
         "pred_flat_long":  r(pred_counts["flat_long"], n),
         "pred_flat_short": r(pred_counts["flat_short"], n),

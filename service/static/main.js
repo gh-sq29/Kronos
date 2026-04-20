@@ -74,7 +74,8 @@ async function loadChart() {
 async function loadStats() {
   try {
     const threshold = parseFloat(document.getElementById('volatility-threshold').value) || 0.5;
-    const res = await fetch(`/api/stats?threshold=${threshold}`);
+    const actThreshold = parseFloat(document.getElementById('act-volatility-threshold').value) || 0.1;
+    const res = await fetch(`/api/stats?threshold=${threshold}&act_threshold=${actThreshold}`);
     const { stats } = await res.json();
     renderStats(stats);
   } catch (e) {
@@ -123,8 +124,9 @@ function renderStats(stats) {
         <div class="window-label">${w} min</div>
         <div class="no-data">Collecting data…</div>`;
     } else {
-      const da = s.direction_accuracy != null ? (s.direction_accuracy * 100).toFixed(1) + '%' : '—';
-      const daCls = dirClass(s.direction_accuracy);
+      const daVal = d ? d.dir_acc : (s.direction_accuracy != null ? s.direction_accuracy * 100 : null);
+      const da = daVal != null ? daVal.toFixed(1) + '%' : '—';
+      const daCls = daVal != null ? (daVal >= 55 ? 'good' : daVal <= 45 ? 'bad' : '') : '';
       const d = s.direction;
       const dirSection = d ? `
         <div class="stat-section-label">预测分布</div>
@@ -202,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('predict-btn').addEventListener('click', onPredict);
   document.getElementById('volatility-threshold').addEventListener('change', loadStats);
+  document.getElementById('act-volatility-threshold').addEventListener('change', loadStats);
   document.getElementById('refresh-stats-btn').addEventListener('click', loadStats);
 
   setInterval(loadChart, CHART_REFRESH_MS);
