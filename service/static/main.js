@@ -173,6 +173,14 @@ function renderStats(stats, gridId = 'stats-grid') {
         <div class="stat-row">
           <span class="label">去重多 / 空</span>
           <span class="value"><span class="dir-long">${d.dedup_long_count ?? '—'}</span> / <span class="dir-short">${d.dedup_short_count ?? '—'}</span></span>
+        </div>
+        <div class="stat-row">
+          <span class="label">去重 Acc</span>
+          <span class="value ${d.dedup_dir_acc != null ? (d.dedup_dir_acc >= 55 ? 'good' : d.dedup_dir_acc <= 45 ? 'bad' : '') : ''}">${d.dedup_dir_acc != null ? d.dedup_dir_acc.toFixed(1) + '%' : '—'}</span>
+        </div>
+        <div class="stat-row">
+          <span class="label">去重 PnL 合计</span>
+          <span class="value ${d.dedup_pnl_sum != null ? (d.dedup_pnl_sum > 0 ? 'good' : d.dedup_pnl_sum < 0 ? 'bad' : '') : ''}">${d.dedup_pnl_sum != null ? (d.dedup_pnl_sum > 0 ? '+' : '') + d.dedup_pnl_sum.toFixed(3) + '%' : '—'}</span>
         </div>` : ''}` : ''}
         ${dirSection}`;
     }

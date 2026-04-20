@@ -103,6 +103,7 @@ def compute_direction_breakdown(pairs: list[dict], pred_threshold_pct: float, ac
     dedup_long = dedup_short = 0
     dedup_ll = dedup_lfl = dedup_lfs = dedup_ls = None
     dedup_ss = dedup_sfs = dedup_sfl = dedup_sl = None
+    dedup_dir_acc = dedup_pnl_sum = None
 
     if compute_dedup:
         DEDUP_MS = 20 * 60 * 1000
@@ -130,10 +131,18 @@ def compute_direction_breakdown(pairs: list[dict], pred_threshold_pct: float, ac
 
         dl_out = {c: 0 for c in CATS}
         ds_out = {c: 0 for c in CATS}
+        correct = 0
+        pnl_sum = 0.0
         for s in dedup_signals:
             act_pct = (s["last_actual"] - s["prev_close"]) / s["prev_close"] * 100
             ad = classify(act_pct, act_threshold_pct)
             (dl_out if s["dir"] == "long" else ds_out)[ad] += 1
+            if (s["dir"] == "long" and act_pct > 0) or (s["dir"] == "short" and act_pct < 0):
+                correct += 1
+            pnl_sum += act_pct if s["dir"] == "long" else -act_pct
+        total_dedup = dedup_long + dedup_short
+        dedup_dir_acc = round(correct / total_dedup * 100, 1) if total_dedup else None
+        dedup_pnl_sum = round(pnl_sum, 3)
 
         def do(d_out, total, cat):
             return r(d_out[cat], total)
@@ -153,6 +162,8 @@ def compute_direction_breakdown(pairs: list[dict], pred_threshold_pct: float, ac
         "pred_short_count": ps,
         "dedup_long_count":  dedup_long,
         "dedup_short_count": dedup_short,
+        "dedup_dir_acc": dedup_dir_acc,
+        "dedup_pnl_sum": dedup_pnl_sum,
         "dedup_ll": dedup_ll, "dedup_lfl": dedup_lfl, "dedup_lfs": dedup_lfs, "dedup_ls": dedup_ls,
         "dedup_ss": dedup_ss, "dedup_sfs": dedup_sfs, "dedup_sfl": dedup_sfl, "dedup_sl": dedup_sl,
         "pred_long":       r(pl, n),
