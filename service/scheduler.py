@@ -32,7 +32,7 @@ async def get_window_pairs(window: int, now_ms: int) -> list[dict]:
         prev_close = prev_actuals[-1]["close"] if prev_actuals else None
         if not prev_close:
             continue
-        pairs.append({"pred_close": pred["close"], "actual_close": actual["close"], "prev_close": prev_close, "err": abs(pred["close"] - actual["close"])})
+        pairs.append({"pred_close": pred["close"], "actual_close": actual["close"], "prev_close": prev_close, "err": abs(pred["close"] - actual["close"]), "run_time_ms": run_start_ms})
     return pairs
 
 
@@ -58,7 +58,7 @@ async def get_window_pairs_for_range(window: int, start_ms: int, end_ms: int) ->
         if not prev_close:
             continue
         pairs.append({"pred_close": pred["close"], "actual_close": actual["close"],
-                      "prev_close": prev_close, "err": abs(pred["close"] - actual["close"])})
+                      "prev_close": prev_close, "err": abs(pred["close"] - actual["close"]), "run_time_ms": run_start_ms})
     return pairs
 
 
@@ -100,10 +100,33 @@ def compute_direction_breakdown(pairs: list[dict], pred_threshold_pct: float, ac
     ss_count = outcomes.get(("short", "short"), 0)
     directional = pl + ps
 
+    # Deduplicated long/short: consecutive same-direction signals within 20 min are merged
+    DEDUP_MS = 20 * 60 * 1000
+    sorted_pairs = sorted(pairs, key=lambda p: p.get("run_time_ms", 0))
+    dedup_long = 0
+    dedup_short = 0
+    last_dir = None
+    last_time_ms = None
+    for p in sorted_pairs:
+        prev = p["prev_close"]
+        pd = classify((p["pred_close"] - prev) / prev * 100, pred_threshold_pct)
+        if pd not in ("long", "short"):
+            continue
+        t = p.get("run_time_ms", 0)
+        if last_dir is None or pd != last_dir or (t - last_time_ms) > DEDUP_MS:
+            if pd == "long":
+                dedup_long += 1
+            else:
+                dedup_short += 1
+            last_dir = pd
+        last_time_ms = t
+
     return {
         "dir_acc": round((ll_count + ss_count) / directional * 100, 1) if directional else None,
         "pred_long_count":  pl,
         "pred_short_count": ps,
+        "dedup_long_count":  dedup_long,
+        "dedup_short_count": dedup_short,
         "pred_long":       r(pl, n),
         "pred_flat_long":  r(pred_counts["flat_long"], n),
         "pred_flat_short": r(pred_counts["flat_short"], n),

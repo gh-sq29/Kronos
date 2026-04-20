@@ -163,6 +163,10 @@ function renderStats(stats, gridId = 'stats-grid') {
         <div class="stat-row">
           <span class="label">预测多 / 空</span>
           <span class="value"><span class="dir-long">${d.pred_long_count ?? '—'}</span> / <span class="dir-short">${d.pred_short_count ?? '—'}</span></span>
+        </div>
+        <div class="stat-row">
+          <span class="label">去重多 / 空</span>
+          <span class="value"><span class="dir-long">${d.dedup_long_count ?? '—'}</span> / <span class="dir-short">${d.dedup_short_count ?? '—'}</span></span>
         </div>` : ''}
         ${dirSection}`;
     }
