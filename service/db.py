@@ -123,10 +123,12 @@ async def get_predictions_for_run(run_id: str) -> list[dict]:
 
 
 async def get_predictions_by_run_time(run_time_ms: int, tolerance_ms: int = 30_000) -> list[dict]:
-    """Return predictions for the run whose run_id timestamp is within tolerance of run_time_ms."""
+    """Return predictions for the run whose run_id falls within the same minute as run_time_ms."""
     from datetime import datetime, timezone, timedelta
-    lo_dt = datetime.fromtimestamp((run_time_ms - tolerance_ms) / 1000, tz=timezone.utc)
-    hi_dt = datetime.fromtimestamp((run_time_ms + tolerance_ms) / 1000, tz=timezone.utc)
+    base_dt = datetime.fromtimestamp(run_time_ms / 1000, tz=timezone.utc)
+    # Align to the minute boundary so passing HH:MM:00 finds any run from HH:MM:00 to HH:MM:59
+    lo_dt = base_dt.replace(second=0, microsecond=0)
+    hi_dt = lo_dt + timedelta(seconds=59, microseconds=999999)
     # run_id is ISO format UTC string — lexicographic comparison works for same-timezone strings
     lo_str = lo_dt.isoformat()
     hi_str = hi_dt.isoformat()
