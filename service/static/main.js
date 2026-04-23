@@ -269,16 +269,20 @@ function msToLocal(ms) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function pctCell(pct) {
+function pctCell(pct, threshold) {
   if (pct == null) return '<td style="text-align:right;color:var(--muted)">—</td>';
-  const cls = pct > 0 ? 'color:var(--red)' : pct < 0 ? 'color:var(--green)' : 'color:var(--muted)';
+  const color = pct > 0 ? 'var(--red)' : pct < 0 ? 'var(--green)' : 'var(--muted)';
   const sign = pct > 0 ? '+' : '';
-  return `<td style="text-align:right;font-weight:600;${cls}">${sign}${pct.toFixed(3)}%</td>`;
+  const highlight = threshold != null && Math.abs(pct) >= threshold
+    ? `background:${pct > 0 ? 'rgba(246,70,93,0.18)' : 'rgba(14,203,129,0.18)'};border-radius:3px;`
+    : '';
+  return `<td style="text-align:right;font-weight:600;color:${color};${highlight}">${sign}${pct.toFixed(3)}%</td>`;
 }
 
 async function loadPointHistory() {
-  const startVal = document.getElementById('pt-start').value;
-  const duration = parseInt(document.getElementById('pt-duration').value) || 20;
+  const startVal  = document.getElementById('pt-start').value;
+  const duration  = parseInt(document.getElementById('pt-duration').value) || 20;
+  const threshold = parseFloat(document.getElementById('pt-threshold').value) || null;
   const status   = document.getElementById('pt-status');
   const btn      = document.getElementById('pt-query-btn');
 
@@ -312,7 +316,7 @@ async function loadPointHistory() {
         if (!s) {
           cells += `<td style="${borderLeft}padding:5px 8px;text-align:right;color:var(--muted)">—</td><td style="text-align:right;color:var(--muted)">—</td>`;
         } else {
-          cells += `<td style="${borderLeft}padding:5px 8px;text-align:right;">${s.close.toLocaleString()}</td>${pctCell(s.pct)}`;
+          cells += `<td style="${borderLeft}padding:5px 8px;text-align:right;">${s.close.toLocaleString()}</td>${pctCell(s.pct, threshold)}`;
         }
       }
 
