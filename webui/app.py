@@ -628,6 +628,96 @@ def predict():
     except Exception as e:
         return jsonify({'error': f'Prediction failed: {str(e)}'}), 500
 
+@app.route('/api/history-query', methods=['POST'])
+def history_query():
+    """Query prediction results for each minute in a time range"""
+    try:
+        data = request.get_json()
+        file_path = data.get('file_path')
+        start_time = data.get('start_time')
+        duration = int(data.get('duration', 20))
+
+        if not file_path or not start_time:
+            return jsonify({'error': 'file_path and start_time are required'}), 400
+
+        if not (MODEL_AVAILABLE and predictor is not None):
+            return jsonify({'error': 'Model not loaded, please load model first'}), 400
+
+        df, error = load_data_file(file_path)
+        if error:
+            return jsonify({'error': error}), 400
+
+        start_dt = pd.to_datetime(start_time)
+        time_diff = df['timestamps'].iloc[1] - df['timestamps'].iloc[0]
+        lookback = 400
+        pred_len = 20  # only need up to step 20
+
+        required_cols = ['open', 'high', 'low', 'close']
+        if 'volume' in df.columns:
+            required_cols.append('volume')
+
+        results = []
+        for i in range(duration + 1):
+            query_time = start_dt + i * time_diff
+
+            # Rows strictly before query_time are the "completed" bars
+            before_mask = df['timestamps'] < query_time
+            before_df = df[before_mask]
+
+            if len(before_df) < lookback:
+                continue
+
+            baseline_row = before_df.iloc[-1]
+            baseline_close = float(baseline_row['close'])
+            baseline_time = baseline_row['timestamps'].isoformat()
+
+            x_df_rows = before_df.iloc[-lookback:]
+            x_df = x_df_rows[required_cols].copy()
+            x_timestamp = x_df_rows['timestamps'].reset_index(drop=True)
+
+            last_ts = x_df_rows['timestamps'].iloc[-1]
+            y_ts_index = pd.date_range(start=last_ts + time_diff, periods=pred_len, freq=time_diff)
+            y_timestamp = pd.Series(y_ts_index, name='timestamps')
+
+            try:
+                pred_df = predictor.predict(
+                    df=x_df,
+                    x_timestamp=x_timestamp,
+                    y_timestamp=y_timestamp,
+                    pred_len=pred_len,
+                    T=1.0,
+                    top_p=0.9,
+                    sample_count=1
+                )
+            except Exception as e:
+                results.append({
+                    'query_time': query_time.isoformat(),
+                    'baseline_time': baseline_time,
+                    'baseline_close': baseline_close,
+                    'error': str(e)
+                })
+                continue
+
+            steps = {}
+            for step in [5, 10, 15, 20]:
+                if step <= len(pred_df):
+                    pred_close = float(pred_df.iloc[step - 1]['close'])
+                    pct = (pred_close - baseline_close) / baseline_close * 100
+                    steps[str(step)] = {'close': round(pred_close, 4), 'pct': round(pct, 3)}
+
+            results.append({
+                'query_time': query_time.isoformat(),
+                'baseline_time': baseline_time,
+                'baseline_close': round(baseline_close, 4),
+                'steps': steps
+            })
+
+        return jsonify({'success': True, 'results': results, 'time_diff_minutes': time_diff.total_seconds() / 60})
+
+    except Exception as e:
+        return jsonify({'error': f'History query failed: {str(e)}'}), 500
+
+
 @app.route('/api/load-model', methods=['POST'])
 def load_model():
     """Load Kronos model"""

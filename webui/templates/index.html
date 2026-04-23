@@ -427,15 +427,75 @@
             .main-content {
                 grid-template-columns: 1fr;
             }
-            
+
             .container {
                 padding: 10px;
             }
-            
+
             .header h1 {
                 font-size: 2rem;
             }
         }
+
+        .history-query-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .history-query-section h2 {
+            color: #4a5568;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+
+        .history-query-form {
+            display: flex;
+            gap: 20px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .history-query-form .form-group {
+            margin-bottom: 0;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .history-result-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .history-result-table th,
+        .history-result-table td {
+            border: 1px solid #e2e8f0;
+            padding: 8px 12px;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .history-result-table th {
+            background: #f7fafc;
+            color: #4a5568;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .history-result-table td:first-child,
+        .history-result-table td:nth-child(2) {
+            text-align: center;
+        }
+
+        .pct-positive { color: #e53e3e; font-weight: 600; }
+        .pct-negative { color: #38a169; font-weight: 600; }
+        .pct-zero     { color: #718096; }
     </style>
 </head>
 <body>
@@ -631,6 +691,56 @@
                 </div>
             </div>
         </div>
+
+        <!-- History Single-Point Time Query -->
+        <div class="history-query-section">
+            <h2>🔍 历史单点时间查询</h2>
+            <div class="history-query-form">
+                <div class="form-group">
+                    <label for="history-start-time">查询起始时间：</label>
+                    <input type="datetime-local" id="history-start-time" step="60">
+                    <small class="form-text">该时刻的基准数据为其前一根1分钟K线</small>
+                </div>
+                <div class="form-group">
+                    <label for="history-duration">往后时长（分钟）：</label>
+                    <input type="number" id="history-duration" value="20" min="1" max="120" step="1">
+                    <small class="form-text">从起始时间向后查询的分钟数</small>
+                </div>
+                <div class="form-group" style="flex: 0 0 auto;">
+                    <label>&nbsp;</label>
+                    <button id="history-query-btn" class="btn btn-success" disabled>
+                        🔍 开始查询
+                    </button>
+                </div>
+            </div>
+            <div id="history-loading" class="loading">
+                <div class="spinner"></div>
+                <p>推理中，请稍候...</p>
+            </div>
+            <div id="history-status" class="status" style="display:none;"></div>
+            <div id="history-result" style="display:none; overflow-x: auto;">
+                <table class="history-result-table">
+                    <thead>
+                        <tr>
+                            <th rowspan="2">查询时间</th>
+                            <th rowspan="2">基准时间</th>
+                            <th rowspan="2">基准Close</th>
+                            <th colspan="2">+5分钟</th>
+                            <th colspan="2">+10分钟</th>
+                            <th colspan="2">+15分钟</th>
+                            <th colspan="2">+20分钟</th>
+                        </tr>
+                        <tr>
+                            <th>预测Close</th><th>涨跌%</th>
+                            <th>预测Close</th><th>涨跌%</th>
+                            <th>预测Close</th><th>涨跌%</th>
+                            <th>预测Close</th><th>涨跌%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-tbody"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -719,6 +829,7 @@
                     showStatus('success', response.data.message);
                     updateModelStatus();
                     document.getElementById('predict-btn').disabled = false;
+                    if (currentDataFile) document.getElementById('history-query-btn').disabled = false;
                     console.log('✅ Model loaded successfully:', response.data.model_info);
                 } else {
                     showStatus('error', response.data.error);
@@ -799,6 +910,7 @@
                     // Update prediction button status
                     if (modelLoaded) {
                         document.getElementById('predict-btn').disabled = false;
+                        document.getElementById('history-query-btn').disabled = false;
                     }
                     
                     console.log('✅ Data loaded successfully:', response.data.data_info);
@@ -1196,6 +1308,9 @@
             
             // Prediction button
             document.getElementById('predict-btn').addEventListener('click', startPrediction);
+
+            // History query button
+            document.getElementById('history-query-btn').addEventListener('click', startHistoryQuery);
             
             // Prediction quality parameter sliders
             document.getElementById('temperature').addEventListener('input', function() {
@@ -1209,6 +1324,99 @@
             // Update slider when lookback window size changes
             document.getElementById('lookback').addEventListener('input', updateSliderFromInputs);
             document.getElementById('pred-len').addEventListener('input', updateSliderFromInputs);
+        }
+
+        // History query
+        async function startHistoryQuery() {
+            if (!currentDataFile) {
+                showHistoryStatus('error', '请先加载数据文件');
+                return;
+            }
+            if (!modelLoaded) {
+                showHistoryStatus('error', '请先加载模型');
+                return;
+            }
+
+            const startTime = document.getElementById('history-start-time').value;
+            const duration = parseInt(document.getElementById('history-duration').value);
+
+            if (!startTime) {
+                showHistoryStatus('error', '请输入查询起始时间');
+                return;
+            }
+
+            try {
+                showHistoryLoading(true);
+                document.getElementById('history-query-btn').disabled = true;
+                document.getElementById('history-result').style.display = 'none';
+
+                const response = await axios.post('/api/history-query', {
+                    file_path: currentDataFile,
+                    start_time: startTime,
+                    duration: duration
+                });
+
+                if (response.data.success) {
+                    fillHistoryTable(response.data.results);
+                    document.getElementById('history-result').style.display = 'block';
+                    showHistoryStatus('success', `查询完成，共 ${response.data.results.length} 条记录`);
+                } else {
+                    showHistoryStatus('error', response.data.error);
+                }
+            } catch (error) {
+                showHistoryStatus('error', `查询失败: ${error.response?.data?.error || error.message}`);
+            } finally {
+                showHistoryLoading(false);
+                document.getElementById('history-query-btn').disabled = false;
+            }
+        }
+
+        function fillHistoryTable(results) {
+            const tbody = document.getElementById('history-tbody');
+            tbody.innerHTML = '';
+
+            for (const row of results) {
+                const tr = document.createElement('tr');
+
+                const fmtTime = (iso) => iso.replace('T', ' ').slice(0, 16);
+                const fmtPct = (pct) => {
+                    if (pct === undefined) return '-';
+                    const cls = pct > 0 ? 'pct-positive' : pct < 0 ? 'pct-negative' : 'pct-zero';
+                    const sign = pct > 0 ? '+' : '';
+                    return `<span class="${cls}">${sign}${pct.toFixed(3)}%</span>`;
+                };
+
+                let cells = `<td>${fmtTime(row.query_time)}</td>
+                             <td>${fmtTime(row.baseline_time)}</td>
+                             <td>${row.baseline_close}</td>`;
+
+                if (row.error) {
+                    cells += `<td colspan="8" style="color:#e53e3e;text-align:center;">${row.error}</td>`;
+                } else {
+                    for (const step of [5, 10, 15, 20]) {
+                        const s = row.steps && row.steps[String(step)];
+                        cells += s
+                            ? `<td>${s.close}</td><td>${fmtPct(s.pct)}</td>`
+                            : `<td>-</td><td>-</td>`;
+                    }
+                }
+
+                tr.innerHTML = cells;
+                tbody.appendChild(tr);
+            }
+        }
+
+        function showHistoryStatus(type, message) {
+            const el = document.getElementById('history-status');
+            el.className = `status ${type}`;
+            el.textContent = message;
+            el.style.display = 'block';
+            setTimeout(() => { el.style.display = 'none'; }, 6000);
+        }
+
+        function showHistoryLoading(show) {
+            const el = document.getElementById('history-loading');
+            if (show) el.classList.add('show'); else el.classList.remove('show');
         }
 
         // Display status information
