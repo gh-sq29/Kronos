@@ -89,6 +89,11 @@
         <input type="number" id="hist-act-volatility-threshold" value="0.1" min="0.01" max="10" step="0.1" style="width:52px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;">
         %
       </label>
+      <label class="threshold-label">
+        对比间隔 m
+        <input type="number" id="hist-m" value="60" min="30" max="90" step="1" style="width:40px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;">
+        min
+      </label>
       <button class="btn btn-refresh" id="hist-query-btn">查询</button>
     </div>
     <div id="hist-status" style="color:var(--muted);font-size:12px;padding:4px 0;min-height:18px;"></div>

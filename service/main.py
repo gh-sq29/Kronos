@@ -119,10 +119,11 @@ async def get_stats(threshold: float = 0.5, act_threshold: float = 0.1):
 
 
 @app.get("/api/stats/range")
-async def get_stats_range(start: str, end: str, threshold: float = 0.5, act_threshold: float = 0.1):
+async def get_stats_range(start: str, end: str, threshold: float = 0.5, act_threshold: float = 0.1, m: int = 0):
     """
     Compute stats for a custom time range.
     start/end: local datetime strings (UTC+8), e.g. "2025-01-01T12:00" or "2025-01-01T12:00:00".
+    m: optional comparison interval — also compute direction accuracy against actual at T+m.
     """
     from datetime import datetime, timezone, timedelta
     try:
@@ -136,6 +137,10 @@ async def get_stats_range(start: str, end: str, threshold: float = 0.5, act_thre
     for w in [5, 10, 15, 20]:
         pairs = await scheduler.get_window_pairs_for_range(w, start_ms, end_ms)
         breakdown = scheduler.compute_direction_breakdown(pairs, threshold, act_threshold, compute_dedup=(w == 20))
+        breakdown_m = None
+        if m > 0:
+            pairs_m = await scheduler.get_window_pairs_for_range_vs_m(w, m, start_ms, end_ms)
+            breakdown_m = scheduler.compute_direction_breakdown(pairs_m, threshold, act_threshold)
         if pairs:
             errors = [p["err"] for p in pairs]
             result[w] = {
@@ -144,10 +149,11 @@ async def get_stats_range(start: str, end: str, threshold: float = 0.5, act_thre
                 "min_deviation": min(errors),
                 "sample_count": len(pairs),
                 "direction": breakdown,
+                "direction_m": breakdown_m,
             }
         else:
             result[w] = None
-    return {"stats": result, "threshold": threshold, "act_threshold": act_threshold}
+    return {"stats": result, "threshold": threshold, "act_threshold": act_threshold, "m": m}
 
 
 @app.get("/api/price")

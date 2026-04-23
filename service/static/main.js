@@ -112,7 +112,7 @@ function dirBar(items) {
   ).join('');
 }
 
-function renderStats(stats, gridId = 'stats-grid') {
+function renderStats(stats, gridId = 'stats-grid', m = null) {
   const grid = document.getElementById(gridId);
   grid.innerHTML = '';
   for (const w of [5, 10, 15, 20]) {
@@ -142,6 +142,18 @@ function renderStats(stats, gridId = 'stats-grid') {
         <div class="dir-row">${dirBar([['dir-long','多',d.dedup_ll],['dir-flat-long','波多',d.dedup_lfl],['dir-flat-short','波空',d.dedup_lfs],['dir-short','空',d.dedup_ls]])}</div>
         <div class="stat-section-label">去重预测空 → 实际（延展跨度）</div>
         <div class="dir-row">${dirBar([['dir-short','空',d.dedup_ss],['dir-flat-short','波空',d.dedup_sfs],['dir-flat-long','波多',d.dedup_sfl],['dir-long','多',d.dedup_sl]])}</div>` : ''}` : '';
+      const dm = s.direction_m;
+      const dmVal = dm ? dm.dir_acc : null;
+      const dmSection = dm ? `
+        <div class="stat-section-label">── 对比 T+${m} ──</div>
+        <div class="stat-row">
+          <span class="label">方向准确率 (T+${m})</span>
+          <span class="value ${dmVal != null ? (dmVal >= 55 ? 'good' : dmVal <= 45 ? 'bad' : '') : ''}">${dmVal != null ? dmVal.toFixed(1) + '%' : '—'}</span>
+        </div>
+        <div class="stat-section-label">预测多 → 实际(T+${m})</div>
+        <div class="dir-row">${dirBar([['dir-long','多',dm.ll],['dir-flat-long','波多',dm.lfl],['dir-flat-short','波空',dm.lfs],['dir-short','空',dm.ls]])}</div>
+        <div class="stat-section-label">预测空 → 实际(T+${m})</div>
+        <div class="dir-row">${dirBar([['dir-short','空',dm.ss],['dir-flat-short','波空',dm.sfs],['dir-flat-long','波多',dm.sfl],['dir-long','多',dm.sl]])}</div>` : '';
       card.innerHTML = `
         <div class="window-label">${w} min</div>
         <div class="stat-row">
@@ -182,7 +194,8 @@ function renderStats(stats, gridId = 'stats-grid') {
           <span class="label">去重 PnL 合计</span>
           <span class="value ${d.dedup_pnl_sum != null ? (d.dedup_pnl_sum > 0 ? 'good' : d.dedup_pnl_sum < 0 ? 'bad' : '') : ''}">${d.dedup_pnl_sum != null ? (d.dedup_pnl_sum > 0 ? '+' : '') + d.dedup_pnl_sum.toFixed(3) + '%' : '—'}</span>
         </div>` : ''}` : ''}
-        ${dirSection}`;
+        ${dirSection}
+        ${dmSection}`;
     }
     grid.appendChild(card);
   }
@@ -205,11 +218,12 @@ async function loadHistoricalStats() {
   status.textContent = '查询中…';
   const threshold    = parseFloat(document.getElementById('hist-volatility-threshold').value) || 0.5;
   const actThreshold = parseFloat(document.getElementById('hist-act-volatility-threshold').value) || 0.1;
+  const m            = parseInt(document.getElementById('hist-m').value) || 0;
   try {
-    const res = await fetch(`/api/stats/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&threshold=${threshold}&act_threshold=${actThreshold}`);
+    const res = await fetch(`/api/stats/range?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}&threshold=${threshold}&act_threshold=${actThreshold}&m=${m}`);
     if (!res.ok) { const d = await res.json(); status.textContent = '查询失败: ' + (d.detail || res.status); return; }
-    const { stats } = await res.json();
-    renderStats(stats, 'hist-stats-grid');
+    const { stats, m: mParam } = await res.json();
+    renderStats(stats, 'hist-stats-grid', mParam > 0 ? mParam : null);
     status.textContent = `查询成功 · ${start} ~ ${end}`;
   } catch (e) {
     status.textContent = '查询失败: ' + e;
