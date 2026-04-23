@@ -105,6 +105,51 @@
     </div>
   </div>
 
+  <!-- Point History Query -->
+  <div class="stats-section">
+    <div class="stats-header">
+      <h2>历史单点时间查询</h2>
+      <label class="threshold-label">
+        起始时间
+        <input type="datetime-local" id="pt-start" class="hist-input" step="60">
+      </label>
+      <label class="threshold-label">
+        往后时长
+        <input type="number" id="pt-duration" value="20" min="1" max="120" step="1"
+               style="width:48px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:2px 5px;font-size:11px;">
+        min
+      </label>
+      <button class="btn btn-refresh" id="pt-query-btn">查询</button>
+    </div>
+    <div id="pt-status" style="color:var(--muted);font-size:12px;padding:4px 0;min-height:18px;"></div>
+    <div id="pt-result" style="display:none;overflow-x:auto;">
+      <table id="pt-table" style="width:100%;border-collapse:collapse;font-size:12px;font-family:'Roboto Mono',monospace;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--muted);">
+            <th rowspan="2" style="padding:6px 10px;text-align:left;">查询时间</th>
+            <th rowspan="2" style="padding:6px 10px;text-align:left;">基准时间</th>
+            <th rowspan="2" style="padding:6px 10px;text-align:right;">基准Close</th>
+            <th colspan="2" style="padding:6px 10px;text-align:center;border-left:1px solid var(--border);">+5 min</th>
+            <th colspan="2" style="padding:6px 10px;text-align:center;border-left:1px solid var(--border);">+10 min</th>
+            <th colspan="2" style="padding:6px 10px;text-align:center;border-left:1px solid var(--border);">+15 min</th>
+            <th colspan="2" style="padding:6px 10px;text-align:center;border-left:1px solid var(--border);">+20 min</th>
+          </tr>
+          <tr style="border-bottom:1px solid var(--border);color:var(--muted);">
+            <th style="padding:4px 8px;text-align:right;border-left:1px solid var(--border);">Close</th>
+            <th style="padding:4px 8px;text-align:right;">涨跌%</th>
+            <th style="padding:4px 8px;text-align:right;border-left:1px solid var(--border);">Close</th>
+            <th style="padding:4px 8px;text-align:right;">涨跌%</th>
+            <th style="padding:4px 8px;text-align:right;border-left:1px solid var(--border);">Close</th>
+            <th style="padding:4px 8px;text-align:right;">涨跌%</th>
+            <th style="padding:4px 8px;text-align:right;border-left:1px solid var(--border);">Close</th>
+            <th style="padding:4px 8px;text-align:right;">涨跌%</th>
+          </tr>
+        </thead>
+        <tbody id="pt-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 
 <div class="footer">

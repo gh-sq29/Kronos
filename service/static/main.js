@@ -262,6 +262,75 @@ async function onPredict() {
   }
 }
 
+// ── Point history query ──────────────────────────────────────
+function msToLocal(ms) {
+  const d = new Date(ms);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function pctCell(pct) {
+  if (pct == null) return '<td style="text-align:right;color:var(--muted)">—</td>';
+  const cls = pct > 0 ? 'color:var(--red)' : pct < 0 ? 'color:var(--green)' : 'color:var(--muted)';
+  const sign = pct > 0 ? '+' : '';
+  return `<td style="text-align:right;font-weight:600;${cls}">${sign}${pct.toFixed(3)}%</td>`;
+}
+
+async function loadPointHistory() {
+  const startVal = document.getElementById('pt-start').value;
+  const duration = parseInt(document.getElementById('pt-duration').value) || 20;
+  const status   = document.getElementById('pt-status');
+  const btn      = document.getElementById('pt-query-btn');
+
+  if (!startVal) { status.textContent = '请填写起始时间'; return; }
+
+  btn.disabled = true;
+  status.textContent = '查询中…';
+  document.getElementById('pt-result').style.display = 'none';
+
+  try {
+    const res = await fetch(`/api/point-history?start=${encodeURIComponent(startVal)}&duration=${duration}`);
+    if (!res.ok) {
+      const d = await res.json();
+      status.textContent = '查询失败: ' + (d.detail || res.status);
+      return;
+    }
+    const { results } = await res.json();
+    const tbody = document.getElementById('pt-tbody');
+    tbody.innerHTML = '';
+
+    for (const row of results) {
+      const baseClose = row.baseline_close != null ? row.baseline_close.toLocaleString() : '—';
+      let cells = `
+        <td style="padding:5px 10px;white-space:nowrap;">${msToLocal(row.query_ms)}</td>
+        <td style="padding:5px 10px;white-space:nowrap;color:var(--muted);">${msToLocal(row.baseline_ms)}</td>
+        <td style="padding:5px 10px;text-align:right;">${baseClose}</td>`;
+
+      for (const step of [5, 10, 15, 20]) {
+        const s = row.steps[step];
+        const borderLeft = 'border-left:1px solid var(--border);';
+        if (!s) {
+          cells += `<td style="${borderLeft}padding:5px 8px;text-align:right;color:var(--muted)">—</td><td style="text-align:right;color:var(--muted)">—</td>`;
+        } else {
+          cells += `<td style="${borderLeft}padding:5px 8px;text-align:right;">${s.close.toLocaleString()}</td>${pctCell(s.pct)}`;
+        }
+      }
+
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid var(--border)';
+      tr.innerHTML = cells;
+      tbody.appendChild(tr);
+    }
+
+    document.getElementById('pt-result').style.display = 'block';
+    status.textContent = `查询完成 · ${results.length} 条记录`;
+  } catch (e) {
+    status.textContent = '查询失败: ' + e;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ── Boot ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initChart();
@@ -273,6 +342,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('hist-end').value   = fmtLocalDatetime(now);
   document.getElementById('hist-start').value = fmtLocalDatetime(new Date(now - 2 * 3600 * 1000));
   document.getElementById('hist-query-btn').addEventListener('click', loadHistoricalStats);
+  document.getElementById('pt-query-btn').addEventListener('click', loadPointHistory);
+  document.getElementById('pt-start').value = fmtLocalDatetime(new Date(now - 30 * 60 * 1000));
 
   document.getElementById('predict-btn').addEventListener('click', onPredict);
   document.getElementById('volatility-threshold').addEventListener('change', loadStats);

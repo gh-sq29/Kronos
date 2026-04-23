@@ -156,6 +156,59 @@ async def get_stats_range(start: str, end: str, threshold: float = 0.5, act_thre
     return {"stats": result, "threshold": threshold, "act_threshold": act_threshold, "m": m}
 
 
+@app.get("/api/point-history")
+async def point_history(start: str, duration: int = 20, tz_offset: float = 8.0):
+    """
+    For each minute from `start` to `start + duration` minutes, return the stored
+    prediction run at that minute and the K-line just before it as baseline.
+
+    - start: local datetime string, e.g. "2026-04-23T12:56:00"
+    - duration: how many minutes forward to query (inclusive, so duration+1 rows)
+    - tz_offset: UTC offset of the supplied datetime, default 8 (UTC+8)
+
+    Each row contains:
+      - query_ms: UTC ms of the query minute
+      - baseline_ms: UTC ms of the bar just before (T-1 min)
+      - baseline_close: close price of that bar
+      - steps: {5, 10, 15, 20} → {close, pct} predicted close and % change from baseline
+    """
+    from datetime import datetime, timezone, timedelta
+    try:
+        start_dt = datetime.fromisoformat(start) - timedelta(hours=tz_offset)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="start must be ISO format, e.g. 2026-04-23T12:56:00")
+
+    results = []
+    for i in range(duration + 1):
+        query_dt_utc = start_dt + timedelta(minutes=i)
+        query_ms = int(query_dt_utc.replace(tzinfo=timezone.utc).timestamp() * 1000)
+        baseline_ms = query_ms - 60_000
+
+        baseline_list = await db.get_klines_in_range(baseline_ms, baseline_ms)
+        baseline = baseline_list[0] if baseline_list else None
+
+        preds = await db.get_predictions_by_run_time(query_ms)
+
+        steps = {}
+        for step in [5, 10, 15, 20]:
+            if len(preds) >= step:
+                pred_close = preds[step - 1]["close"]
+                pct = (pred_close - baseline["close"]) / baseline["close"] * 100 if baseline else None
+                steps[step] = {
+                    "close": round(pred_close, 2),
+                    "pct": round(pct, 3) if pct is not None else None,
+                }
+
+        results.append({
+            "query_ms": query_ms,
+            "baseline_ms": baseline_ms,
+            "baseline_close": round(baseline["close"], 2) if baseline else None,
+            "steps": steps,
+        })
+
+    return {"results": results}
+
+
 @app.get("/api/price")
 async def get_price():
     return {"price": binance_ws.get_latest_price()}
